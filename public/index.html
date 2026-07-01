@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>家庭理财 Agent - 钱多多</title>
+  <title>FIRELY - 财务独立目标管理</title>
   <style>
     * {
       margin: 0;
@@ -55,6 +55,47 @@
     .toolbar {
       display: flex;
       gap: 10px;
+    }
+
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      right: 0;
+      background-color: white;
+      min-width: 160px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      border-radius: 8px;
+      z-index: 1000;
+      overflow: hidden;
+    }
+
+    .dropdown-content button {
+      width: 100%;
+      padding: 12px 16px;
+      text-align: left;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      transition: background-color 0.2s;
+    }
+
+    .dropdown-content button:hover {
+      background-color: #f3f4f6;
+    }
+
+    .dropdown-content button i {
+      margin-right: 8px;
+    }
+
+    .dropdown.show .dropdown-content {
+      display: block;
     }
 
     .dashboard {
@@ -109,6 +150,7 @@
     .health-light.healthy { background-color: #22c55e; color: #22c55e; }
     .health-light.warning { background-color: #eab308; color: #eab308; }
     .health-light.danger { background-color: #ef4444; color: #ef4444; }
+    .health-light.unknown { background-color: #6b7280; color: #6b7280; }
 
     .health-status {
       font-size: 1.2rem;
@@ -786,33 +828,43 @@
   </style>
 </head>
 <body>
+  <script src="./js/localStorageService.js"></script>
+  <script src="./js/frontendService.js"></script>
   <div class="container">
     <div class="header">
-      <h1>💰 钱多多 - 家庭理财 Agent</h1>
+      <h1>🔥 FIRELY - 财务独立目标管理</h1>
       <div class="toolbar">
         <button class="btn-settings" onclick="openUserInfoModal()" title="个人信息设置">👤</button>
         <button class="btn-settings" onclick="openDepositListModal()" title="资金存放池管理">💰</button>
+        <div class="dropdown" id="data-dropdown">
+          <button class="btn-settings" onclick="toggleDataDropdown()" title="数据管理">📄</button>
+          <div class="dropdown-content">
+            <button onclick="handleExportData()">📥 导出数据</button>
+            <button onclick="triggerImportData()">📤 导入数据</button>
+          </div>
+        </div>
       </div>
+      <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleFileSelect(event)">
     </div>
     
     <div class="dashboard">
       <div class="card">
-        <div class="card-title">资金总余额</div>
+        <div class="card-title">资金总余额（万元）</div>
         <div class="card-value" id="capital-balance" style="color: #3b82f6;">¥ 0.00</div>
       </div>
       
       <div class="card">
-        <div class="card-title">年度理财总收益</div>
+        <div class="card-title">年度理财总收益（万元）</div>
         <div class="card-value" id="annual-investment" style="color: #10b981;">¥ 0.00</div>
       </div>
       
       <div class="card">
-        <div class="card-title">月度结余</div>
+        <div class="card-title">月度结余（万元）</div>
         <div class="card-value" id="monthly-balance" style="color: #667eea;">N/A</div>
       </div>
       
       <div class="card">
-        <div class="card-title">年度结余</div>
+        <div class="card-title">年度结余（万元）</div>
         <div class="card-value" id="annual-balance" style="color: #667eea;">N/A</div>
       </div>
       
@@ -837,13 +889,13 @@
       </div>
       
       <div class="card fire-section">
-        <div class="card-title">🔥 FIRE 目标</div>
-        <div class="card-value" id="fire-target">¥ 0.00</div>
+        <div class="card-title">🔥 FIRE 目标（万元）</div>
+        <div class="card-value" id="fire-target">0.00万</div>
         <div class="progress-bar">
           <div class="progress-fill" id="fire-progress" style="width: 0%"></div>
         </div>
         <div class="progress-text">已完成 <span id="fire-percentage">0%</span></div>
-        <div class="remaining-amount" id="fire-remaining">距离 FIRE 还需: ¥ 0.00</div>
+        <div class="remaining-amount" id="fire-remaining">距离 FIRE 还需（万元）: 0.00万</div>
         <div class="remaining-amount" style="background: rgba(255,255,255,0.2);" id="fire-years">还需 <span style="font-size: 1.4rem;">0</span> 年实现 FIRE</div>
       </div>
     </div>
@@ -851,7 +903,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="all">全部收入</button>
       <button class="tab" data-tab="distribution">资金分布</button>
-      <button class="tab" data-tab="capital">资金余额</button>
+      <button class="tab" data-tab="capital">资金余额趋势</button>
       <button class="tab" data-tab="investment">理财收益</button>
     </div>
 
@@ -877,9 +929,14 @@
 
   <div class="modal-overlay" id="welcome-modal" style="display: flex;">
     <div class="modal" style="max-width: 450px;">
-      <h3 class="modal-title">👋 欢迎使用钱多多</h3>
+      <h3 class="modal-title">👋 欢迎使用 FIRELY - 财务独立目标管理</h3>
       <p style="color: #666; margin-bottom: 20px;">为了更好地为您计算FIRE目标，请提供以下信息：</p>
       
+      <div class="form-group">
+        <label class="form-label">目前家庭年收入（万元） <span style="color: #ef4444;">*</span></label>
+        <input type="number" step="0.1" class="form-input" id="welcome-annual-income" value="10" min="0">
+      </div>
+
       <div class="form-group">
         <label class="form-label">目前家庭年支出（万元） <span style="color: #ef4444;">*</span></label>
         <input type="number" step="0.1" class="form-input" id="welcome-annual-expense" value="5" min="0">
@@ -896,8 +953,8 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn-cancel" onclick="skipWelcome()">跳过</button>
-        <button class="btn-submit" onclick="saveUserInfo()" style="flex: 1;">确认</button>
+        <button class="btn-cancel" id="skip-welcome-btn" onclick="window.skipWelcome()">跳过</button>
+        <button class="btn-submit" id="save-user-info-btn" style="flex: 1;" onclick="window.saveUserInfo()">确认</button>
       </div>
     </div>
   </div>
@@ -1007,12 +1064,12 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">资金余额</label>
+        <label class="form-label">资金余额（万元）</label>
         <input type="text" class="form-input" id="capital-balance-input" placeholder="0.00">
       </div>
 
       <div class="form-group">
-        <label class="form-label">理财收益</label>
+        <label class="form-label">理财收益（万元）</label>
         <input type="text" class="form-input" id="investment-balance-input" placeholder="可输入负数">
       </div>
 
@@ -1033,14 +1090,137 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="delete-confirm-modal">
+    <div class="modal" style="max-width: 400px;">
+      <h3 class="modal-title" style="color: #ef4444;">⚠️ 确认删除</h3>
+      <p style="color: #666; margin: 20px 0; text-align: center; font-size: 1rem;">
+        点击删除后，这条记录将无法找回。<br>请确认是否删除？
+      </p>
+      <div class="form-actions">
+        <button class="btn-cancel" onclick="closeDeleteConfirmModal()">否</button>
+        <button class="btn-submit" style="background-color: #ef4444;" onclick="confirmDeleteTransaction()">是</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    window.submitTransaction = async function() {
+    console.log('========== Main script started ==========');
+    
+    let userAge = 30;
+    let userGender = 'male';
+    let userAnnualIncome = 0;
+    let userAnnualExpense = 50000;
+    let userRiskProfile = '';
+    let editingTransactionId = null;
+    let editingAccountId = null;
+    let deletingTransactionId = null;
+
+    window.skipWelcome = function() {
+      userGender = 'male';
+      userAnnualIncome = 100000;
+      userAnnualExpense = 50000;
+      userRiskProfile = 'moderate';
+      
+      window.frontendService.saveUserInfo({
+        gender: userGender,
+        annualIncome: userAnnualIncome,
+        annualExpense: userAnnualExpense,
+        riskProfile: userRiskProfile
+      });
+      
+      document.getElementById('welcome-modal').style.display = 'none';
+      if (window.refreshData) {
+        window.refreshData();
+      }
+    };
+
+    window.saveUserInfo = async function() {
+      try {
+        console.log('saveUserInfo called');
+        
+        const incomeInput = document.getElementById('welcome-annual-income');
+        const expenseInput = document.getElementById('welcome-annual-expense');
+        const riskSelect = document.getElementById('welcome-risk-profile');
+        
+        if (!incomeInput || !expenseInput || !riskSelect) {
+          alert('表单元素未找到');
+          return;
+        }
+        
+        const annualIncome = parseFloat(incomeInput.value);
+        if (isNaN(annualIncome) || annualIncome <= 0) {
+          alert('请输入有效的家庭年收入（大于0）');
+          return;
+        }
+        
+        const annualExpense = parseFloat(expenseInput.value);
+        if (isNaN(annualExpense) || annualExpense < 0) {
+          alert('请输入有效的家庭年支出（大于等于0）');
+          return;
+        }
+        
+        const riskProfile = riskSelect.value;
+        if (!riskProfile) {
+          alert('请选择您的家庭理财情况');
+          return;
+        }
+        
+        userAnnualIncome = annualIncome * 10000;
+        userAnnualExpense = annualExpense * 10000;
+        userRiskProfile = riskProfile;
+        
+        window.frontendService.saveUserInfo({
+          gender: userGender,
+          annualIncome: userAnnualIncome,
+          annualExpense: userAnnualExpense,
+          riskProfile: userRiskProfile
+        });
+        
+        document.getElementById('welcome-modal').style.display = 'none';
+        
+        if (window.refreshData) {
+          await window.refreshData();
+        }
+        
+        alert('保存成功！');
+      } catch (error) {
+        console.error('Error in saveUserInfo:', error);
+        alert('保存失败: ' + error.message);
+      }
+    };
+
+    async function saveDefaultUserInfo() {
+      userGender = 'male';
+      userAnnualIncome = 100000;
+      userAnnualExpense = 50000;
+      userRiskProfile = 'moderate';
+      
+      window.frontendService.saveUserInfo({
+        gender: userGender,
+        annualIncome: userAnnualIncome,
+        annualExpense: userAnnualExpense,
+        riskProfile: userRiskProfile
+      });
+      
+      document.getElementById('welcome-modal').style.display = 'none';
+      await window.refreshData();
+    }
+
+    async function refreshData() {
+      await refreshSummary();
+      await refreshTransactions('all');
+      await refreshFireInfo();
+      await refreshDepositAccounts();
+    }
+    window.refreshData = refreshData;
+
+    window.submitTransaction = function() {
       const depositAccountId = parseInt(document.getElementById('deposit-account-select').value);
       const capitalBalanceInput = document.getElementById('capital-balance-input').value;
       const investmentBalanceInput = document.getElementById('investment-balance-input').value;
       
-      const capitalBalance = capitalBalanceInput ? parseFloat(capitalBalanceInput) : 0;
-      const investmentBalance = investmentBalanceInput ? parseFloat(investmentBalanceInput) : 0;
+      const capitalBalance = capitalBalanceInput ? parseFloat(capitalBalanceInput) * 10000 : 0;
+      const investmentBalance = investmentBalanceInput ? parseFloat(investmentBalanceInput) * 10000 : 0;
       const description = document.getElementById('description-input').value;
       const date = document.getElementById('date-input').value;
 
@@ -1054,7 +1234,7 @@
         return;
       }
 
-      const depositAccounts = await window.fetchData('/deposit-accounts');
+      const depositAccounts = window.frontendService.getAllDepositAccounts();
       const selectedAccount = depositAccounts.find(a => a.id === depositAccountId);
       
       if (selectedAccount.type === 'bank' && !selectedAccount.repaymentDay) {
@@ -1076,53 +1256,25 @@
           date, 
           depositAccountId 
         };
-        console.log('========== submitTransaction 开始 ==========');
-        console.log('提交数据:', data);
-        console.log('window.editingTransactionId 值:', window.editingTransactionId);
-        console.log('window.editingTransactionId 类型:', typeof window.editingTransactionId);
-        console.log('window.editingTransactionId 是否为 truthy:', !!window.editingTransactionId);
-        console.log('window.editingTransactionId !== null:', window.editingTransactionId !== null);
         
-        let response;
-        if (window.editingTransactionId) {
-          console.log('发送 PUT 请求到:', `/api/transactions/${window.editingTransactionId}`);
-          response = await fetch(`/api/transactions/${window.editingTransactionId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
+        if (editingTransactionId) {
+          window.frontendService.updateTransaction(editingTransactionId, data);
         } else {
-          response = await fetch('/api/transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
+          window.frontendService.addTransaction(data);
         }
 
-        if (response.ok) {
-          window.closeModal();
-          await window.refreshData();
-          window.editingTransactionId = null;
-        } else {
-          const errorData = await response.json();
-          const actionText = window.editingTransactionId ? '修改' : '添加';
-          alert(actionText + '失败: ' + (errorData.error || '未知错误'));
-        }
+        window.closeModal();
+        window.refreshData();
+        editingTransactionId = null;
       } catch (error) {
-        alert('网络错误，请重试: ' + error.message);
+        alert('操作失败: ' + error.message);
       }
     };
     
-    window.openEditModal = async function(transactionId) {
-      console.log('========== openEditModal 开始 ==========');
-      console.log('transactionId 参数:', transactionId);
-      console.log('transactionId 类型:', typeof transactionId);
-      window.editingTransactionId = transactionId;
-      console.log('window.editingTransactionId 已设置为:', window.editingTransactionId);
-      console.log('window.editingTransactionId 类型:', typeof window.editingTransactionId);
-      
-      await window.refreshDepositAccounts();
-      const transaction = await window.fetchData(`/transactions/${transactionId}`);
+    window.openEditModal = function(transactionId) {
+      editingTransactionId = transactionId;
+      window.refreshDepositAccounts();
+      const transaction = window.frontendService.getTransactionById(transactionId);
       
       if (!transaction) {
         alert('无法获取交易记录，请刷新页面重试');
@@ -1130,8 +1282,8 @@
       }
       
       document.getElementById('deposit-account-select').value = transaction.depositAccountId || '';
-      document.getElementById('capital-balance-input').value = transaction.capitalBalance || '';
-      document.getElementById('investment-balance-input').value = transaction.investmentBalance || '';
+      document.getElementById('capital-balance-input').value = transaction.capitalBalance ? (transaction.capitalBalance / 10000).toFixed(2) : '';
+      document.getElementById('investment-balance-input').value = transaction.investmentBalance ? (transaction.investmentBalance / 10000).toFixed(2) : '';
       document.getElementById('description-input').value = transaction.description || '';
       document.getElementById('date-input').value = transaction.date || '';
       
@@ -1150,411 +1302,175 @@
     
     window.closeModal = function() {
       document.getElementById('modal-overlay').classList.remove('active');
-      window.editingTransactionId = null;
+      editingTransactionId = null;
     };
-    
-    window.editingTransactionId = null;
-    
-    const INCOME_CATEGORIES = ['工资', '奖金', '投资收益', '兼职', '其他收入'];
-    const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '娱乐', '医疗', '教育', '房租', '水电', '其他支出'];
-    
-    const DEPOSIT_ACCOUNT_OPTIONS = [
-      { name: '招商银行', type: 'bank' },
-      { name: '中国农业银行', type: 'bank' },
-      { name: '江苏银行', type: 'bank' },
-      { name: '盛京银行', type: 'bank' },
-      { name: '支付宝', type: 'alipay' },
-      { name: '京东金融', type: 'jd' },
-      { name: '微信余额', type: 'wechat' },
-      { name: '广发证券', type: 'securities' },
-    ];
-    
-    let userAge = 30;
-    let userGender = 'male';
-    let userAnnualIncome = 0;
-    let userAnnualExpense = 50000;
-    let userRiskProfile = '';
 
-    function getUserInfo() {
-      const saved = localStorage.getItem('userInfo');
-      if (saved) {
-        const info = JSON.parse(saved);
-        userAge = info.age;
-        userGender = info.gender;
-        userAnnualIncome = info.annualIncome || 0;
-        userAnnualExpense = info.annualExpense || 50000;
-        userRiskProfile = info.riskProfile || '';
-        return true;
-      }
-      return false;
-    }
 
-    function saveUserInfo() {
-      const annualIncome = parseFloat(document.getElementById('welcome-annual-income').value);
-      if (!annualIncome || annualIncome <= 0) {
-        alert('请输入有效的家庭年收入（大于0）');
-        return;
-      }
-      
-      const annualExpense = parseFloat(document.getElementById('welcome-annual-expense').value);
-      if (!annualExpense || annualExpense < 0) {
-        alert('请输入有效的家庭年支出（大于等于0）');
-        return;
-      }
-      
-      const riskProfile = document.getElementById('welcome-risk-profile').value;
-      if (!riskProfile) {
-        alert('请选择您的家庭理财情况');
-        return;
-      }
-      
-      userAnnualIncome = annualIncome * 10000;
-      userAnnualExpense = annualExpense * 10000;
-      userRiskProfile = riskProfile;
-      
-      const userInfo = { 
-        gender: userGender,
-        annualIncome: userAnnualIncome,
-        annualExpense: userAnnualExpense,
-        riskProfile: userRiskProfile
-      };
-      localStorage.setItem('userInfo', JSON.stringify(userInfo));
-      
-      document.getElementById('welcome-modal').style.display = 'none';
-      refreshData();
-    }
-
-    function skipWelcome() {
-      localStorage.setItem('userInfo', JSON.stringify({ 
-        gender: 'male',
-        annualIncome: 100000,
-        annualExpense: 50000,
-        riskProfile: 'moderate'
-      }));
-      document.getElementById('welcome-modal').style.display = 'none';
-      refreshData();
-    }
-
-    async function fetchData(url) {
-      const response = await fetch(`/api${url}`);
-      return response.json();
-    }
-    window.fetchData = fetchData;
-
-    async function refreshData() {
-      await refreshSummary();
-      await refreshTransactions('all');
-      await refreshFireInfo();
-      await refreshDepositAccounts();
-    }
 
     async function refreshSummary() {
-      const transactions = await fetchData('/transactions');
-      const incomeTransactions = transactions.filter(t => t.type === 'income');
-
-      const monthlyData = {};
-      incomeTransactions.forEach(t => {
-        const date = new Date(t.date);
-        const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        const capitalBalance = t.capitalBalance || t.amount || 0;
-        const investmentBalance = t.investmentBalance || 0;
-        
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { year, totalCapital: 0, totalInvestment: 0 };
-        }
-        monthlyData[monthKey].totalCapital += capitalBalance;
-        monthlyData[monthKey].totalInvestment += investmentBalance;
-      });
-
-      const sortedMonths = Object.keys(monthlyData).sort((a, b) => b.localeCompare(a));
-      const currentMonthKey = sortedMonths[0] || null;
-      const currentYear = new Date().getFullYear();
+      const summary = window.frontendService.getMonthlySummary();
       
-      const currentMonthCapital = currentMonthKey ? monthlyData[currentMonthKey].totalCapital : 0;
-      document.getElementById('capital-balance').textContent = formatMoney(currentMonthCapital);
+      const capitalBalanceEl = document.getElementById('capital-balance');
+      if (capitalBalanceEl) capitalBalanceEl.textContent = summary.currentMonthCapitalFormatted;
       
-      let annualBalance = 'N/A';
-      const currentYearMonths = Object.keys(monthlyData).filter(k => monthlyData[k].year === currentYear);
-      const lastYearMonths = Object.keys(monthlyData).filter(k => monthlyData[k].year === currentYear - 1);
-      
-      if (currentYearMonths.length > 0) {
-        const currentYearTotal = currentYearMonths.reduce((sum, k) => sum + monthlyData[k].totalCapital, 0);
-        if (lastYearMonths.length > 0) {
-          const lastYearTotal = lastYearMonths.reduce((sum, k) => sum + monthlyData[k].totalCapital, 0);
-          const balance = currentYearTotal - lastYearTotal;
-          const sign = balance >= 0 ? '+' : '';
-          annualBalance = sign + formatMoney(balance);
-          document.getElementById('annual-balance').style.color = balance >= 0 ? '#10b981' : '#ef4444';
-        } else {
-          annualBalance = 'N/A';
-          document.getElementById('annual-balance').style.color = '#667eea';
-        }
+      const annualBalanceEl = document.getElementById('annual-balance');
+      if (annualBalanceEl) {
+        annualBalanceEl.textContent = summary.annualBalance;
+        annualBalanceEl.style.color = summary.annualBalanceValue >= 0 ? '#10b981' : '#ef4444';
       }
-      document.getElementById('annual-balance').textContent = annualBalance;
       
-      let monthlyBalance = 'N/A';
-      const monthsAsc = Object.keys(monthlyData).sort((a, b) => a.localeCompare(b));
-      if (monthsAsc.length >= 2) {
-        const currentMonth = monthsAsc[monthsAsc.length - 1];
-        const prevMonth = monthsAsc[monthsAsc.length - 2];
-        const balance = monthlyData[currentMonth].totalCapital - monthlyData[prevMonth].totalCapital;
-        const sign = balance >= 0 ? '+' : '';
-        monthlyBalance = sign + formatMoney(balance);
-        document.getElementById('monthly-balance').style.color = balance >= 0 ? '#10b981' : '#ef4444';
-      } else {
-        document.getElementById('monthly-balance').style.color = '#667eea';
+      const monthlyBalanceEl = document.getElementById('monthly-balance');
+      if (monthlyBalanceEl) {
+        monthlyBalanceEl.textContent = summary.monthlyBalance;
+        monthlyBalanceEl.style.color = summary.monthlyBalanceValue >= 0 ? '#10b981' : '#ef4444';
       }
-      document.getElementById('monthly-balance').textContent = monthlyBalance;
       
-      let annualInvestment = 0;
-      if (currentYearMonths.length > 0) {
-        annualInvestment = currentYearMonths.reduce((sum, k) => sum + monthlyData[k].totalInvestment, 0);
+      const annualInvestmentEl = document.getElementById('annual-investment');
+      if (annualInvestmentEl) {
+        annualInvestmentEl.textContent = summary.annualInvestmentFormatted;
+        annualInvestmentEl.style.color = summary.annualInvestment >= 0 ? '#10b981' : '#ef4444';
       }
-      document.getElementById('annual-investment').textContent = formatMoney(annualInvestment);
-      document.getElementById('annual-investment').style.color = annualInvestment >= 0 ? '#10b981' : '#ef4444';
-      
-      let savingsRate = 'N/A';
-       if (monthsAsc.length >= 2) {
-         let totalMonthlySavings = 0;
-         let monthCount = 0;
-         
-         for (let i = 1; i < monthsAsc.length; i++) {
-           const currentMonth = monthsAsc[i];
-           const prevMonth = monthsAsc[i - 1];
-           const capitalChange = monthlyData[currentMonth].totalCapital - monthlyData[prevMonth].totalCapital;
-           const investmentIncome = monthlyData[currentMonth].totalInvestment;
-           const monthlySavings = capitalChange - investmentIncome;
-           totalMonthlySavings += monthlySavings;
-           monthCount++;
-         }
-         
-         let annualSavings;
-         if (monthCount >= 12) {
-           const recent12MonthsAsc = monthsAsc.slice(-12);
-           annualSavings = 0;
-           for (let i = 1; i < recent12MonthsAsc.length; i++) {
-             const currentMonth = recent12MonthsAsc[i];
-             const prevMonth = recent12MonthsAsc[i - 1];
-             const capitalChange = monthlyData[currentMonth].totalCapital - monthlyData[prevMonth].totalCapital;
-             const investmentIncome = monthlyData[currentMonth].totalInvestment;
-             annualSavings += capitalChange - investmentIncome;
-           }
-         } else {
-           annualSavings = (totalMonthlySavings / monthCount) * 12;
-         }
-         
-         const annualExpense = userAnnualExpense || 0;
-         const annualIncome = annualSavings + annualExpense;
-         
-         if (annualIncome > 0) {
-           const rate = (annualSavings / annualIncome * 100).toFixed(1);
-           savingsRate = rate + '%';
-         }
-       }
       
       const healthLight = document.getElementById('health-light');
       const healthStatusEl = document.getElementById('health-status');
       const healthMessageEl = document.getElementById('health-message');
       const healthSavingsRateEl = document.getElementById('health-savings-rate');
       
-      healthSavingsRateEl.textContent = savingsRate;
+      const healthStatus = window.frontendService.getHealthStatus();
       
-      let status = 'danger';
-      let statusText = '❌ 未知';
-      let message = '请输入足够的数据以计算储蓄率';
-      
-      if (savingsRate !== 'N/A') {
-        const rate = parseFloat(savingsRate.replace('%', ''));
-        if (!isNaN(rate)) {
-          if (rate >= 50) {
-            status = 'healthy';
-            statusText = '✅ 优秀';
-            message = '储蓄率非常健康！继续保持';
-          } else if (rate > 0 && rate < 50) {
-            status = 'warning';
-            statusText = '⚠️ 注意';
-            message = '财务状况有待提高！储蓄率较低';
-          } else {
-            status = 'danger';
-            statusText = '❌ 危险';
-            message = '储蓄率为负或零，需要调整支出习惯';
-          }
-        }
-      }
-      
-      healthLight.className = `health-light ${status}`;
-      healthStatusEl.textContent = statusText;
-      healthMessageEl.textContent = message;
+      if (healthSavingsRateEl) healthSavingsRateEl.textContent = summary.savingsRate;
+      if (healthLight) healthLight.className = `health-light ${healthStatus.status}`;
+      if (healthStatusEl) healthStatusEl.textContent = healthStatus.statusText;
+      if (healthMessageEl) healthMessageEl.textContent = healthStatus.message;
       
       const investmentHealthLight = document.getElementById('investment-health-light');
       const investmentHealthStatusEl = document.getElementById('investment-health-status');
       const investmentHealthMessageEl = document.getElementById('investment-health-message');
       const investmentAnnualRateEl = document.getElementById('investment-annual-rate');
       
-      let investmentRate = 'N/A';
-      let investmentStatus = 'danger';
-      let investmentStatusText = '❌ 未知';
-      let investmentMessage = '请输入足够的数据以计算年化利率';
+      const investmentHealthStatus = window.frontendService.getInvestmentHealthStatus();
       
-      const n = monthsAsc.length;
-      
-      if (n <= 1) {
-        investmentRate = 'N/A';
-        investmentStatus = 'danger';
-        investmentStatusText = '❌ 未知';
-        investmentMessage = '数据不足，无法计算年化利率';
-      } else if (n >= 2 && n <= 11) {
-        let product = 1;
-        for (let i = 1; i < monthsAsc.length; i++) {
-          const currentMonth = monthsAsc[i];
-          const prevMonth = monthsAsc[i - 1];
-          if (monthlyData[prevMonth].totalCapital > 0) {
-            const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-            product *= (1 + rate);
-          }
-        }
-        const annualRate = Math.pow(product, 12 / (n - 1)) - 1;
-        investmentRate = (annualRate * 100).toFixed(2) + '%';
-        
-        const rateValue = annualRate * 100;
-        if (rateValue >= 3.5) {
-          investmentStatus = 'healthy';
-          investmentStatusText = '✅ 优秀';
-          investmentMessage = '理财收益表现优秀！继续保持';
-        } else if (rateValue > 0 && rateValue < 3.5) {
-          investmentStatus = 'warning';
-          investmentStatusText = '⚠️ 注意';
-          investmentMessage = '理财收益有待提高！可以考虑优化配置';
-        } else {
-          investmentStatus = 'danger';
-          investmentStatusText = '❌ 危险';
-          investmentMessage = '理财收益为负或零，需要调整投资策略';
-        }
-      } else if (n >= 12) {
-        const recent12MonthsAsc = monthsAsc.slice(-12);
-        let product = 1;
-        for (let i = 1; i < recent12MonthsAsc.length; i++) {
-          const currentMonth = recent12MonthsAsc[i];
-          const prevMonth = recent12MonthsAsc[i - 1];
-          if (monthlyData[prevMonth].totalCapital > 0) {
-            const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-            product *= (1 + rate);
-          }
-        }
-        const annualRate = product - 1;
-        investmentRate = (annualRate * 100).toFixed(2) + '%';
-        
-        const rateValue = annualRate * 100;
-        if (rateValue >= 3.5) {
-          investmentStatus = 'healthy';
-          investmentStatusText = '✅ 优秀';
-          investmentMessage = '理财收益表现优秀！继续保持';
-        } else if (rateValue > 0 && rateValue < 3.5) {
-          investmentStatus = 'warning';
-          investmentStatusText = '⚠️ 注意';
-          investmentMessage = '理财收益有待提高！可以考虑优化配置';
-        } else {
-          investmentStatus = 'danger';
-          investmentStatusText = '❌ 危险';
-          investmentMessage = '理财收益为负或零，需要调整投资策略';
-        }
-      }
-      
-      investmentAnnualRateEl.textContent = investmentRate;
-      investmentHealthLight.className = `health-light ${investmentStatus}`;
-      investmentHealthStatusEl.textContent = investmentStatusText;
-      investmentHealthMessageEl.textContent = investmentMessage;
-    }
-
-    function getStatusText(status) {
-      const texts = {
-        healthy: '✅ 健康',
-        warning: '⚠️ 注意',
-        danger: '❌ 危险'
-      };
-      return texts[status] || status;
+      if (investmentAnnualRateEl) investmentAnnualRateEl.textContent = investmentHealthStatus.rate;
+      if (investmentHealthLight) investmentHealthLight.className = `health-light ${investmentHealthStatus.status}`;
+      if (investmentHealthStatusEl) investmentHealthStatusEl.textContent = investmentHealthStatus.statusText;
+      if (investmentHealthMessageEl) investmentHealthMessageEl.textContent = investmentHealthStatus.message;
     }
 
     function formatMoney(amount) {
-      return '¥ ' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      const amountInWan = amount / 10000;
+      return '¥ ' + amountInWan.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' 万';
     }
-
+    
+    function showCapitalBarTooltip(event, month, growthRate, amount) {
+      let tooltip = document.getElementById('capital-bar-tooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'capital-bar-tooltip';
+        tooltip.style.cssText = 'position: fixed; background: rgba(0,0,0,0.85); color: white; padding: 12px; border-radius: 8px; font-size: 13px; z-index: 9999; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        document.body.appendChild(tooltip);
+      }
+      const growthColor = growthRate.startsWith('+') ? '#86efac' : growthRate === 'N/A' ? '#9ca3af' : '#fca5a5';
+      tooltip.innerHTML = `<div style="font-weight: 600; margin-bottom: 6px;">${month}</div><div style="opacity: 0.9; margin-bottom: 4px;">增长率: <span style="color: ${growthColor};">${growthRate}</span></div><div style="opacity: 0.9;">金额: ${amount}</div>`;
+      tooltip.style.display = 'block';
+      
+      let left = event.clientX + 15;
+      let top = event.clientY - 60;
+      
+      if (left + tooltip.offsetWidth > window.innerWidth) {
+        left = event.clientX - tooltip.offsetWidth - 15;
+      }
+      if (top < 10) {
+        top = event.clientY + 15;
+      }
+      
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    }
+    
+    function hideCapitalBarTooltip() {
+      const tooltip = document.getElementById('capital-bar-tooltip');
+      if (tooltip) {
+        tooltip.style.display = 'none';
+      }
+    }
+    
+    function showInvestTooltip(event, month, rate, amount) {
+      let tooltip = document.getElementById('invest-tooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'invest-tooltip';
+        tooltip.style.cssText = 'position: fixed; background: rgba(0,0,0,0.85); color: white; padding: 12px; border-radius: 8px; font-size: 13px; z-index: 9999; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        document.body.appendChild(tooltip);
+      }
+      let rateColor;
+      if (rate === 'N/A') {
+        rateColor = '#9ca3af';
+      } else {
+        const rateValue = parseFloat(rate);
+        rateColor = rateValue >= 0 ? '#86efac' : '#fca5a5';
+      }
+      const displayRate = rate !== 'N/A' && parseFloat(rate) >= 0 ? '+' + rate + '%' : rate === 'N/A' ? 'N/A' : rate + '%';
+      tooltip.innerHTML = `<div style="font-weight: 600; margin-bottom: 6px;">${month}</div><div style="opacity: 0.9; margin-bottom: 4px;">收益率: <span style="color: ${rateColor};">${displayRate}</span></div><div style="opacity: 0.9;">收益金额: ${amount}</div>`;
+      tooltip.style.display = 'block';
+      
+      let left = event.clientX + 15;
+      let top = event.clientY - 60;
+      
+      if (left + tooltip.offsetWidth > window.innerWidth) {
+        left = event.clientX - tooltip.offsetWidth - 15;
+      }
+      if (top < 10) {
+        top = event.clientY + 15;
+      }
+      
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    }
+    
+    function hideInvestTooltip() {
+      const tooltip = document.getElementById('invest-tooltip');
+      if (tooltip) {
+        tooltip.style.display = 'none';
+      }
+    }
+    
     async function refreshTransactions(filter) {
-      const transactions = await fetchData('/transactions');
-      const depositAccounts = await fetchData('/deposit-accounts');
-      const incomeTransactions = transactions.filter(t => t.type === 'income');
-      
-      // 将交易记录与资金存放地关联
-      const transactionsWithAccount = incomeTransactions.map(t => {
-        const account = depositAccounts.find(a => a.id === t.depositAccountId);
-        return {
-          ...t,
-          accountName: account ? account.name : '未知账户'
-        };
-      });
-      
-      // 控制标题显示
       const titleElement = document.getElementById('transaction-title');
-      if (filter === 'capital' || filter === 'investment' || filter === 'distribution') {
-        titleElement.style.display = 'none';
-      } else {
-        titleElement.style.display = 'block';
+      if (titleElement) {
+        if (filter === 'capital' || filter === 'investment' || filter === 'distribution') {
+          titleElement.style.display = 'none';
+        } else {
+          titleElement.style.display = 'block';
+        }
       }
       
-      let filtered;
-      if (filter === 'all') {
-        filtered = transactionsWithAccount;
-      } else if (filter === 'capital') {
-        filtered = transactionsWithAccount;
-      } else if (filter === 'investment') {
-        filtered = transactionsWithAccount;
-      } else {
-        filtered = transactionsWithAccount;
-      }
-      
-      displayTransactions(filtered, filter);
+      displayTransactions([], filter);
     }
 
     function displayTransactions(transactions, filter) {
       const container = document.getElementById('transaction-list');
       
-      if (transactions.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            <p>暂无收入记录</p>
-          </div>
-        `;
+      if (!container) {
         return;
       }
 
       if (filter === 'distribution') {
-        const accountData = {};
-        let totalCapital = 0;
+        const distribution = window.frontendService.getCapitalDistribution();
+        const { accountList, totalCapital, displayMonth, hasData } = distribution;
         
-        const now = new Date();
-        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        
-        const currentMonthTransactions = transactions.filter(t => {
-          const transactionDate = new Date(t.date);
-          const transactionMonth = transactionDate.getFullYear() + '-' + String(transactionDate.getMonth() + 1).padStart(2, '0');
-          return transactionMonth === currentMonth;
-        });
-        
-        currentMonthTransactions.forEach(t => {
-          const accountName = t.accountName || '未分类';
-          const capitalBalance = t.capitalBalance || t.amount;
-          
-          if (!accountData[accountName]) {
-            accountData[accountName] = { amount: 0 };
-          }
-          accountData[accountName].amount += capitalBalance;
-          totalCapital += capitalBalance;
-        });
+        if (!hasData) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <p>暂无资金记录</p>
+              <p style="font-size: 0.85rem;">请在"全部收入"标签页添加资金记录</p>
+            </div>
+          `;
+          return;
+        }
         
         const colors = [
           '#667eea', '#764ba2', '#f093fb', '#f5576c', 
@@ -1566,19 +1482,12 @@
         const centerX = chartSize / 2;
         const centerY = chartSize / 2;
         const radius = 120;
-        const labelRadius = 165;
         const padding = 55;
         
         let html = `<div class="chart-section" style="text-align: center; padding: 20px;">`;
-        html += `<h3 style="margin-bottom: 20px; font-size: 1.25rem; color: #333;">资金余额分布</h3>`;
+        html += `<h3 style="margin-bottom: 20px; font-size: 1.25rem; color: #333;">资金余额分布 <span style="font-size: 0.8rem; font-weight: 400; color: #999;">(${displayMonth})</span></h3>`;
         
         html += `<div class="pie-chart-container" style="display: inline-block;"><svg viewBox="0 0 ${chartSize} ${chartSize}" class="pie-chart" style="width: ${chartSize}px; height: ${chartSize}px;">`;
-        
-        const accountList = Object.keys(accountData).map(accountName => ({
-          name: accountName,
-          amount: accountData[accountName].amount,
-          percentage: totalCapital > 0 ? (accountData[accountName].amount / totalCapital * 100) : 0
-        })).sort((a, b) => b.amount - a.amount);
         
         let currentAngle = 0;
         let colorIndex = 0;
@@ -1588,6 +1497,7 @@
           const accountName = item.name;
           const amount = item.amount;
           const percentage = totalCapital > 0 ? (amount / totalCapital * 100).toFixed(1) : '0';
+          const percentageValue = parseFloat(percentage);
           const angle = (amount / totalCapital) * 360;
           
           const startAngle = currentAngle;
@@ -1602,42 +1512,60 @@
           const y2 = centerY + radius * Math.sin(endRad);
           
           const largeArcFlag = angle > 180 ? 1 : 0;
-          
           const pathD = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
           const color = colors[colorIndex % colors.length];
           
-          html += `<path d="${pathD}" fill="${color}" stroke="#fff" stroke-width="2" class="pie-slice" />`;
+          html += `<path d="${pathD}" fill="${color}" stroke="#fff" stroke-width="2" class="pie-slice" style="cursor: pointer;" onclick="handlePieClick('${accountName}')" />`;
           
           const midAngle = (startAngle + endAngle) / 2;
           const midRad = (midAngle - 90) * (Math.PI / 180);
           
-          const lineEndX = centerX + (radius + 12) * Math.cos(midRad);
-          const lineEndY = centerY + (radius + 12) * Math.sin(midRad);
-          
-          let labelX = centerX + labelRadius * Math.cos(midRad);
-          let labelY = centerY + labelRadius * Math.sin(midRad);
-          
-          labelX = Math.max(padding, Math.min(chartSize - padding, labelX));
-          labelY = Math.max(padding, Math.min(chartSize - padding, labelY));
-          
-          let offsetY = 0;
-          const minDistance = 35;
-          for (const pos of usedLabelPositions) {
-            const dist = Math.sqrt(Math.pow(labelX - pos.x, 2) + Math.pow(labelY + offsetY - pos.y, 2));
-            if (dist < minDistance) {
-              offsetY += 18;
+          if (percentageValue < 5 && percentageValue > 0) {
+            const lineEndX = centerX + (radius + 15) * Math.cos(midRad);
+            const lineEndY = centerY + (radius + 15) * Math.sin(midRad);
+            
+            let labelX, labelY;
+            const labelOffset = radius + 85;
+            let normalizedAngle = midAngle % 360;
+            if (normalizedAngle < 0) normalizedAngle += 360;
+            
+            if (normalizedAngle >= 30 && normalizedAngle < 150) {
+              labelX = chartSize - padding - 15;
+              labelY = centerY + (normalizedAngle - 90) * 0.4;
+            } else if (normalizedAngle >= 150 && normalizedAngle < 330) {
+              labelX = padding + 15;
+              labelY = centerY + (normalizedAngle - 180) * 0.3;
+            } else {
+              labelX = centerX + (normalizedAngle < 180 ? 1 : -1) * labelOffset * 0.8;
+              labelY = normalizedAngle < 30 ? padding + 25 : chartSize - padding - 25;
             }
+            
+            labelX = Math.max(padding + 20, Math.min(chartSize - padding - 20, labelX));
+            labelY = Math.max(padding + 25, Math.min(chartSize - padding - 25, labelY));
+            
+            let offsetY = 0;
+            const minDistance = 30;
+            for (const pos of usedLabelPositions) {
+              const dist = Math.sqrt(Math.pow(labelX - pos.x, 2) + Math.pow(labelY + offsetY - pos.y, 2));
+              if (dist < minDistance) {
+                offsetY += 20;
+              }
+            }
+            const finalLabelY = labelY + offsetY;
+            usedLabelPositions.push({ x: labelX, y: finalLabelY });
+            
+            const isLeft = midRad > Math.PI/2 || midRad < -Math.PI/2;
+            const textAnchor = isLeft ? 'end' : 'start';
+            
+            html += `<line x1="${(x1 + x2) / 2}" y1="${(y1 + y2) / 2}" x2="${lineEndX}" y2="${lineEndY}" stroke="#999" stroke-width="1" stroke-dasharray="3,2" />`;
+            html += `<line x1="${lineEndX}" y1="${lineEndY}" x2="${labelX}" y2="${finalLabelY}" stroke="#999" stroke-width="1" stroke-dasharray="3,2" />`;
+            html += `<text x="${labelX}" y="${finalLabelY}" text-anchor="${textAnchor}" font-size="12" font-weight="600" fill="#333">${percentage}%</text>`;
+          } else if (percentageValue >= 5) {
+            const innerRadius = radius * 0.65;
+            const innerX = centerX + innerRadius * Math.cos(midRad);
+            const innerY = centerY + innerRadius * Math.sin(midRad);
+            html += `<text x="${innerX}" y="${innerY}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="600" fill="white">${percentage}%</text>`;
           }
-          const finalLabelY = labelY + offsetY;
-          usedLabelPositions.push({ x: labelX, y: finalLabelY });
-          
-          const isLeft = midRad > Math.PI/2 || midRad < -Math.PI/2;
-          const textAnchor = isLeft ? 'end' : 'start';
-          
-          html += `<line x1="${(x1 + x2) / 2}" y1="${(y1 + y2) / 2}" x2="${lineEndX}" y2="${lineEndY}" stroke="#999" stroke-width="1" stroke-dasharray="3,2" />`;
-          html += `<line x1="${lineEndX}" y1="${lineEndY}" x2="${labelX}" y2="${finalLabelY}" stroke="#999" stroke-width="1" stroke-dasharray="3,2" />`;
-          
-          html += `<text x="${labelX}" y="${finalLabelY}" text-anchor="${textAnchor}" font-size="12" font-weight="600" fill="#333">${percentage}%</text>`;
           
           currentAngle = endAngle;
           colorIndex++;
@@ -1678,158 +1606,180 @@
         
         container.innerHTML = html;
       } else if (filter === 'investment') {
-        const monthlyData = {};
-        transactions.forEach(t => {
-          const date = new Date(t.date);
-          const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-          const monthLabel = (date.getMonth() + 1) + '月';
-          const investmentBalance = t.investmentBalance || 0;
-          const capitalBalance = t.capitalBalance || t.amount;
-          
-          if (!monthlyData[monthKey]) {
-            monthlyData[monthKey] = { 
-              label: monthLabel, 
-              year: date.getFullYear(),
-              totalInvestment: 0,
-              totalCapital: 0
-            };
-          }
-          monthlyData[monthKey].totalInvestment += investmentBalance;
-          monthlyData[monthKey].totalCapital += capitalBalance;
-        });
-
-        const sortedMonths = Object.keys(monthlyData).sort((a, b) => a.localeCompare(b));
+        const investmentData = window.frontendService.getInvestmentChartData();
+        const { monthlyData, sortedMonths, estimatedAnnualRate, hasData } = investmentData;
         
-        sortedMonths.forEach((monthKey, index) => {
-          const prevMonthKey = index > 0 ? sortedMonths[index - 1] : null;
-          if (!prevMonthKey) {
-            monthlyData[monthKey].rate = 'N/A';
-          } else {
-            const prevCapital = monthlyData[prevMonthKey].totalCapital;
-            monthlyData[monthKey].rate = prevCapital > 0 ? (monthlyData[monthKey].totalInvestment / prevCapital * 100).toFixed(2) : '0.00';
-          }
-        });
-        
-        let estimatedAnnualRate = 'N/A';
-        const n = sortedMonths.length;
-        
-        if (n <= 1) {
-          estimatedAnnualRate = 'N/A';
-        } else if (n >= 2 && n <= 11) {
-          let product = 1;
-          for (let i = 1; i < sortedMonths.length; i++) {
-            const currentMonth = sortedMonths[i];
-            const prevMonth = sortedMonths[i - 1];
-            if (monthlyData[prevMonth].totalCapital > 0) {
-              const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-              product *= (1 + rate);
-            }
-          }
-          const annualRate = Math.pow(product, 12 / (n - 1)) - 1;
-          estimatedAnnualRate = (annualRate * 100).toFixed(2) + '%';
-        } else if (n >= 12) {
-          const recent12Months = sortedMonths.slice(-12);
-          let product = 1;
-          for (let i = 1; i < recent12Months.length; i++) {
-            const currentMonth = recent12Months[i];
-            const prevMonth = recent12Months[i - 1];
-            if (monthlyData[prevMonth].totalCapital > 0) {
-              const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-              product *= (1 + rate);
-            }
-          }
-          const annualRate = product - 1;
-          estimatedAnnualRate = (annualRate * 100).toFixed(2) + '%';
+        if (!hasData) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <p>暂无投资记录</p>
+              <p style="font-size: 0.85rem;">请在"全部收入"标签页添加资金记录</p>
+            </div>
+          `;
+          return;
         }
 
-        const maxRate = Math.max(...Object.values(monthlyData).map(d => Math.abs(parseFloat(d.rate))), 1);
+        const chartHeight = 260;
+        const chartWidth = 500;
+        const padding = { top: 40, right: 70, bottom: 55, left: 70 };
+        const innerWidth = chartWidth - padding.left - padding.right;
+        const innerHeight = chartHeight - padding.top - padding.bottom;
         
-        let html = `<div class="chart-section"><div class="chart-header"><h3 style="display: flex; align-items: center; gap: 8px;">理财收益月度收益率 <span onclick="showInvestmentReturnFormulas()" style="cursor: pointer; width: 20px; height: 20px; border-radius: 50%; background: #f59e0b; color: white; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center;">!</span></h3><div class="growth-summary"><div class="growth-item"><span class="growth-label">本月收益率</span><span class="growth-value ${parseFloat(monthlyData[sortedMonths[sortedMonths.length - 1]].rate) >= 0 ? 'positive' : 'negative'}">${monthlyData[sortedMonths[sortedMonths.length - 1]].rate}%</span></div><div class="growth-item"><span class="growth-label">年化利率</span><span class="growth-value ${estimatedAnnualRate !== 'N/A' && parseFloat(estimatedAnnualRate) >= 0 ? 'positive' : 'negative'}">${estimatedAnnualRate}</span></div></div></div><div id="investment-return-formula" style="display: none; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #92400e;"><strong>📐 计算公式：</strong><br>• <strong>月收益率</strong> = 本月理财总收益 / 上月资金总余额 × 100%<br>• <strong>年化利率</strong>：0-1个月数据为N/A；2-11个月数据使用复合增长率公式：(1+r₁)×(1+r₂)×...×(1+rₙ)^(12/(n-1)) - 1；12个月及以上数据使用真实年化：(1+r₁)×(1+r₂)×...×(1+r₁₂) - 1</div><div class="chart-container"><div class="chart-bars">`;
+        const maxInvestment = Math.max(...Object.values(monthlyData).map(d => d.totalInvestment), 1);
+        const maxInvestmentCeil = Math.ceil(maxInvestment / 10000) * 10000;
         
-        sortedMonths.forEach(monthKey => {
+        const rates = sortedMonths.map(m => parseFloat(monthlyData[m].rate));
+        const validRates = rates.filter(r => !isNaN(r));
+        const rateMax = validRates.length > 0 ? Math.max(...validRates.map(Math.abs)) : 5;
+        const rateMaxCeil = Math.ceil(rateMax * 10) / 10 + 0.5;
+        
+        const yAxisSteps = 5;
+        
+        let html = `<div class="chart-section"><div class="chart-header" style="margin-bottom: 8px;"><h3>理财收益月度趋势</h3><div class="growth-summary" style="margin-top: 8px;"><div class="growth-item"><span class="growth-label">本月收益率</span><span class="growth-value ${parseFloat(monthlyData[sortedMonths[sortedMonths.length - 1]].rate) >= 0 ? 'positive' : 'negative'}">${monthlyData[sortedMonths[sortedMonths.length - 1]].rate}%</span></div><div class="growth-item"><span class="growth-label">年化利率</span><span class="growth-value ${estimatedAnnualRate !== 'N/A' && parseFloat(estimatedAnnualRate) >= 0 ? 'positive' : 'negative'}">${estimatedAnnualRate}</span></div></div></div><div class="chart-container" style="display: flex; justify-content: center;"><svg width="${chartWidth}" height="${chartHeight}" style="background: #fff; border-radius: 8px; padding: 8px;">`;
+        
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = padding.top + (i / yAxisSteps) * innerHeight;
+          const invValue = maxInvestmentCeil - (i / yAxisSteps) * maxInvestmentCeil;
+          const rateValue = rateMaxCeil - (i / yAxisSteps) * rateMaxCeil * 2;
+          
+          html += `<line x1="${padding.left}" y1="${y}" x2="${chartWidth - padding.right}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`;
+          html += `<text x="${padding.left - 12}" y="${y + 4}" text-anchor="end" font-size="11" fill="#6b7280">${(invValue / 10000).toFixed(1)}万</text>`;
+          html += `<text x="${chartWidth - padding.right + 35}" y="${y + 4}" text-anchor="end" font-size="11" fill="#6b7280">${rateValue >= 0 ? '+' : ''}${rateValue.toFixed(1)}%</text>`;
+        }
+        
+        const barWidth = innerWidth / (sortedMonths.length + 0.8 * (sortedMonths.length - 1)) * 0.5;
+        const totalBarSpace = innerWidth - barWidth;
+        
+        const linePoints = [];
+        sortedMonths.forEach((monthKey, index) => {
           const data = monthlyData[monthKey];
-          const heightPercent = (Math.abs(parseFloat(data.rate)) / maxRate) * 100;
-          html += `<div class="chart-bar-wrapper"><div class="chart-bar investment" style="height: ${Math.max(heightPercent, 5)}%; background: ${parseFloat(data.rate) >= 0 ? 'linear-gradient(to top, #10b981, #34d399)' : 'linear-gradient(to top, #ef4444, #f87171)'}"><div class="bar-tooltip"><div class="tooltip-value">${data.year}年${data.label}</div><div class="tooltip-amount">收益率: ${data.rate}%</div><div class="tooltip-growth">总收益: ${data.totalInvestment >= 0 ? '+' : ''}${formatMoney(data.totalInvestment)}</div></div></div><div class="chart-label">${data.label}</div></div>`;
+          const barHeight = ((data.totalInvestment / maxInvestmentCeil) * innerHeight);
+          const x = padding.left + (totalBarSpace / (sortedMonths.length - 1)) * index;
+          const barX = x;
+          const barY = padding.top + innerHeight - barHeight;
+          
+          html += `<rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="${data.totalInvestment >= 0 ? 'url(#invGradPos)' : 'url(#invGradNeg)'}" rx="2" style="cursor: pointer;" onmousemove="showInvestTooltip(event, '${data.year}年${data.label}', '${data.rate}', '${formatMoney(data.totalInvestment)}')" onmouseleave="hideInvestTooltip()"></rect>`;
+          
+          const rate = parseFloat(data.rate);
+          if (!isNaN(rate)) {
+            const lineX = x + barWidth / 2;
+            const lineY = padding.top + innerHeight - ((rate + rateMaxCeil) / (rateMaxCeil * 2)) * innerHeight;
+            linePoints.push({ x: lineX, y: lineY });
+          }
         });
         
-        html += `</div></div><div class="chart-legend"><div class="legend-item"><span class="legend-color" style="background: linear-gradient(to top, #10b981, #34d399);"></span><span class="legend-text">正收益</span></div><div class="legend-item"><span class="legend-color" style="background: linear-gradient(to top, #ef4444, #f87171);"></span><span class="legend-text">负收益</span></div></div></div>`;
+        html += `<defs><linearGradient id="invGradPos" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#10b981;stop-opacity:0.8"/><stop offset="100%" style="stop-color:#34d399;stop-opacity:0.8"/></linearGradient><linearGradient id="invGradNeg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.8"/><stop offset="100%" style="stop-color:#f87171;stop-opacity:0.8"/></linearGradient></defs>`;
+        
+        if (linePoints.length > 1) {
+          const lineD = linePoints.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ',' + p.y).join(' ');
+          html += `<path d="${lineD}" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+          linePoints.forEach(p => {
+            html += `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#6366f1" stroke="white" stroke-width="2"/>`;
+          });
+        }
+        
+        html += `<line x1="${padding.left}" y1="${padding.top + innerHeight / 2}" x2="${chartWidth - padding.right}" y2="${padding.top + innerHeight / 2}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,2"/>`;
+        
+        sortedMonths.forEach((monthKey, index) => {
+          const data = monthlyData[monthKey];
+          const x = padding.left + (totalBarSpace / (sortedMonths.length - 1)) * index + barWidth / 2;
+          html += `<text x="${x}" y="${chartHeight - 25}" text-anchor="middle" font-size="11" fill="#374151">${data.label}</text>`;
+        });
+        
+        html += `<text x="${padding.left - 55}" y="${chartHeight / 2}" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(-90, ${padding.left - 55}, ${chartHeight / 2})">收益金额（万元）</text>`;
+        html += `<text x="${chartWidth - padding.right + 55}" y="${chartHeight / 2}" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(90, ${chartWidth - padding.right + 55}, ${chartHeight / 2})">收益率（%）</text>`;
+        
+        html += `</svg></div></div>`;
         
         container.innerHTML = html;
       } else if (filter === 'capital') {
-        const monthlyData = {};
-        transactions.forEach(t => {
-          const date = new Date(t.date);
-          const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-          const monthLabel = (date.getMonth() + 1) + '月';
-          const capitalBalance = t.capitalBalance || t.amount;
-          
-          if (!monthlyData[monthKey]) {
-            monthlyData[monthKey] = { 
-              label: monthLabel, 
-              year: date.getFullYear(),
-              total: 0,
-              count: 0 
-            };
-          }
-          monthlyData[monthKey].total += capitalBalance;
-          monthlyData[monthKey].count++;
-        });
-
-        const sortedMonths = Object.keys(monthlyData).sort((a, b) => a.localeCompare(b));
+        const capitalData = window.frontendService.getCapitalChartData();
+        const { monthlyData, sortedMonths, growthRates, annualGrowth, hasData } = capitalData;
         
-        const growthRates = {};
-        for (let i = 1; i < sortedMonths.length; i++) {
-          const current = sortedMonths[i];
-          const previous = sortedMonths[i - 1];
-          const growth = ((monthlyData[current].total - monthlyData[previous].total) / monthlyData[previous].total * 100).toFixed(2);
-          growthRates[current] = parseFloat(growth);
-        }
-        
-        let annualGrowth = 'N/A';
-        if (sortedMonths.length >= 12) {
-          const currentYearTotal = Object.keys(monthlyData)
-            .filter(k => k.startsWith(String(new Date().getFullYear())))
-            .reduce((sum, k) => sum + monthlyData[k].total, 0);
-          const lastYearTotal = Object.keys(monthlyData)
-            .filter(k => k.startsWith(String(new Date().getFullYear() - 1)))
-            .reduce((sum, k) => sum + monthlyData[k].total, 0);
-          if (lastYearTotal > 0) {
-            annualGrowth = ((currentYearTotal - lastYearTotal) / lastYearTotal * 100).toFixed(2) + '%';
-          }
+        if (!hasData) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <p>暂无资金记录</p>
+              <p style="font-size: 0.85rem;">请在"全部收入"标签页添加资金记录</p>
+            </div>
+          `;
+          return;
         }
 
+        const chartHeight = 260;
+        const chartWidth = 500;
+        const padding = { top: 40, right: 35, bottom: 55, left: 70 };
+        const innerWidth = chartWidth - padding.left - padding.right;
+        const innerHeight = chartHeight - padding.top - padding.bottom;
+        
         const maxValue = Math.max(...Object.values(monthlyData).map(d => d.total));
+        const maxValueCeil = Math.ceil(maxValue / 100000) * 100000;
+        const yAxisSteps = 5;
         
         const latestMonth = sortedMonths[sortedMonths.length - 1];
-        let html = `<div class="chart-section"><div class="chart-header"><h3 style="display: flex; align-items: center; gap: 8px;">资金余额月度增长趋势 <span onclick="showCapitalGrowthFormulas()" style="cursor: pointer; width: 20px; height: 20px; border-radius: 50%; background: #f59e0b; color: white; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center;">!</span></h3><div class="growth-summary"><div class="growth-item"><span class="growth-label">本月增长率</span><span class="growth-value ${growthRates[latestMonth] >= 0 ? 'positive' : 'negative'}">${growthRates[latestMonth] !== undefined ? (growthRates[latestMonth] >= 0 ? '+' : '') + growthRates[latestMonth] + '%' : 'N/A'}</span></div><div class="growth-item"><span class="growth-label">年度增长率</span><span class="growth-value ${annualGrowth !== 'N/A' && parseFloat(annualGrowth) >= 0 ? 'positive' : 'negative'}">${annualGrowth}</span></div></div></div><div id="capital-growth-formula" style="display: none; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #92400e;"><strong>📐 计算公式：</strong><br>• <strong>月度增长率</strong> = (本月资金总余额 - 上月资金总余额) / 上月资金总余额 × 100%<br>• <strong>年度增长率</strong> = (本年资金总余额 -去年资金总余额) / 去年资金总余额 × 100%</div><div class="chart-container"><div class="chart-bars">`;
         
-        sortedMonths.forEach(monthKey => {
+        let html = `<div class="chart-section"><div class="chart-header" style="margin-bottom: 8px;"><h3>资金余额月度趋势</h3><div class="growth-summary" style="margin-top: 8px;"><div class="growth-item"><span class="growth-label">本月增长率</span><span class="growth-value ${growthRates[latestMonth] >= 0 ? 'positive' : 'negative'}">${growthRates[latestMonth] !== undefined ? (growthRates[latestMonth] >= 0 ? '+' : '') + growthRates[latestMonth] + '%' : 'N/A'}</span></div><div class="growth-item"><span class="growth-label">年度增长率</span><span class="growth-value ${annualGrowth !== 'N/A' && parseFloat(annualGrowth) >= 0 ? 'positive' : 'negative'}">${annualGrowth}</span></div></div></div><div class="chart-container" style="display: flex; justify-content: center;"><svg width="${chartWidth}" height="${chartHeight}" style="background: #fff; border-radius: 8px; padding: 8px;">`;
+        
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = padding.top + (i / yAxisSteps) * innerHeight;
+          const value = maxValueCeil - (i / yAxisSteps) * maxValueCeil;
+          html += `<line x1="${padding.left}" y1="${y}" x2="${chartWidth - padding.right}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`;
+          html += `<text x="${padding.left - 12}" y="${y + 4}" text-anchor="end" font-size="11" fill="#6b7280">${(value / 10000).toFixed(1)}万</text>`;
+        }
+        
+        sortedMonths.forEach((monthKey, index) => {
           const data = monthlyData[monthKey];
-          const heightPercent = (data.total / maxValue) * 100;
-          const growthRate = growthRates[monthKey];
-          html += `<div class="chart-bar-wrapper"><div class="chart-bar" style="height: ${Math.max(heightPercent, 5)}%"><div class="bar-tooltip"><div class="tooltip-value">${data.year}年${data.label}</div><div class="tooltip-amount">总余额: ${formatMoney(data.total)}</div><div class="tooltip-growth">增长率: ${growthRate !== undefined ? (growthRate >= 0 ? '+' : '') + growthRate + '%' : 'N/A'}</div></div></div><div class="chart-label">${data.label}</div></div>`;
+          const barHeight = ((data.total / maxValueCeil) * innerHeight);
+          const barWidth = innerWidth / (sortedMonths.length + 0.8 * (sortedMonths.length - 1)) * 0.5;
+          const totalBarSpace = innerWidth - barWidth;
+          const x = padding.left + (totalBarSpace / (sortedMonths.length - 1)) * index;
+          const barX = x;
+          const barY = padding.top + innerHeight - barHeight;
+          const growthRate = growthRates[monthKey] !== undefined ? (growthRates[monthKey] >= 0 ? '+' : '') + growthRates[monthKey] + '%' : 'N/A';
+          
+          html += `<rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="url(#barGradient)" rx="2" style="cursor: pointer;" onmousemove="showCapitalBarTooltip(event, '${data.year}年${data.label}', '${growthRate}', '${formatMoney(data.total)}')" onmouseleave="hideCapitalBarTooltip()"></rect>`;
         });
         
-        html += `</div></div><div class="chart-legend"><div class="legend-item"><span class="legend-color" style="background: linear-gradient(to top, #667eea, #764ba2);"></span><span class="legend-text">资金余额</span></div></div></div>`;
+        html += `<defs><linearGradient id="barGradient" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#667eea;stop-opacity:0.8"/><stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.8"/></linearGradient></defs>`;
+        
+        sortedMonths.forEach((monthKey, index) => {
+          const data = monthlyData[monthKey];
+          const barWidth = innerWidth / (sortedMonths.length + 0.8 * (sortedMonths.length - 1)) * 0.5;
+          const totalBarSpace = innerWidth - barWidth;
+          const x = padding.left + (totalBarSpace / (sortedMonths.length - 1)) * index + barWidth / 2;
+          html += `<text x="${x}" y="${chartHeight - 25}" text-anchor="middle" font-size="11" fill="#374151">${data.label}</text>`;
+        });
+        
+        html += `<text x="${padding.left - 60}" y="${chartHeight / 2}" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(-90, ${padding.left - 60}, ${chartHeight / 2})">金额（万元）</text>`;
+        
+        html += `</svg></div></div>`;
         
         container.innerHTML = html;
       } else {
-        const groupedByMonth = {};
-        transactions.forEach(t => {
-          const date = new Date(t.date);
-          const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-          const monthLabel = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-          if (!groupedByMonth[monthKey]) {
-            groupedByMonth[monthKey] = { label: monthLabel, transactions: [], totalCapital: 0, totalInvestment: 0 };
-          }
-          const capitalBalance = t.capitalBalance || t.amount;
-          const investmentBalance = t.investmentBalance || 0;
-          groupedByMonth[monthKey].totalCapital += capitalBalance;
-          groupedByMonth[monthKey].totalInvestment += investmentBalance;
-          groupedByMonth[monthKey].transactions.push(t);
-        });
-
-        const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => b.localeCompare(a));
+        const groupedData = window.frontendService.getTransactionsGroupedByMonth();
+        const { groupedByMonth, sortedMonths, hasData } = groupedData;
+        
+        if (!hasData) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <p>暂无资金记录</p>
+              <p style="font-size: 0.85rem;">请添加资金记录</p>
+            </div>
+          `;
+          return;
+        }
 
         let html = '';
         
@@ -1845,7 +1795,7 @@
             const investmentColor = investmentBalance >= 0 ? '#10b981' : '#ef4444';
             const investmentSign = investmentBalance >= 0 ? '+' : '';
             
-            html += '<div class="transaction-item"><div class="transaction-info" onclick="openEditModal(' + t.id + ')"><div class="transaction-category">资金存放地：' + t.accountName + '</div><div class="transaction-description">💰 资金余额: ' + formatMoney(capitalBalance) + '</div><div style="font-size: 0.85rem; color: ' + investmentColor + ';">📈 理财收益: ' + investmentSign + formatMoney(investmentBalance) + '</div><div class="transaction-date">' + formatDate(t.date) + '</div></div><div style="display: flex; gap: 12px;"><div style="color: #667eea; cursor: pointer;">✏️ 修改</div><div style="color: #ef4444; cursor: pointer;" onclick="deleteTransaction(' + t.id + ')">🗑️ 删除</div></div></div>';
+            html += '<div class="transaction-item"><div class="transaction-info" onclick="openEditModal(' + t.id + ')"><div class="transaction-category">资金存放地：' + t.accountName + '</div><div class="transaction-description">💰 资金余额: ' + formatMoney(capitalBalance) + '</div><div style="font-size: 0.85rem; color: ' + investmentColor + ';">📈 理财收益: ' + investmentSign + formatMoney(investmentBalance) + '</div><div class="transaction-date">' + formatDate(t.date) + '</div></div><div style="display: flex; gap: 12px;"><div style="color: #667eea; cursor: pointer;" onclick="openEditModal(' + t.id + ')">✏️ 修改</div><div style="color: #ef4444; cursor: pointer;" onclick="deleteTransaction(' + t.id + ')">🗑️ 删除</div></div></div>';
           });
           
           html += '</div>';
@@ -1855,69 +1805,38 @@
       }
     }
 
-    function showCapitalGrowthFormulas() {
-      const formulaDiv = document.getElementById('capital-growth-formula');
-      if (formulaDiv) {
-        formulaDiv.style.display = formulaDiv.style.display === 'none' ? 'block' : 'none';
-      }
-    }
-
-    function showInvestmentReturnFormulas() {
-      const formulaDiv = document.getElementById('investment-return-formula');
-      if (formulaDiv) {
-        formulaDiv.style.display = formulaDiv.style.display === 'none' ? 'block' : 'none';
-      }
-    }
-
     function formatDate(dateStr) {
       const date = new Date(dateStr);
       return `${date.getMonth() + 1}月${date.getDate()}日`;
     }
 
-    async function deleteTransaction(transactionId) {
-      if (!confirm('确定要删除这条收入记录吗？此操作无法撤销。')) {
+    function deleteTransaction(transactionId) {
+      deletingTransactionId = transactionId;
+      document.getElementById('delete-confirm-modal').classList.add('active');
+    }
+
+    function closeDeleteConfirmModal() {
+      document.getElementById('delete-confirm-modal').classList.remove('active');
+      deletingTransactionId = null;
+    }
+
+    function confirmDeleteTransaction() {
+      if (!deletingTransactionId) {
         return;
       }
 
-      try {
-        const response = await fetch(`/api/transactions/${transactionId}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          await refreshTransactions('all');
-          await refreshSummary();
-          await refreshFireInfo();
-          alert('删除成功！');
-        } else {
-          alert('删除失败');
-        }
-      } catch (error) {
-        alert('网络错误: ' + error.message);
-      }
-    }
-
-    async function refreshExpenseCategories() {
-      const categories = await fetchData('/expense-categories');
-      const container = document.getElementById('expense-categories');
+      window.frontendService.deleteTransaction(deletingTransactionId);
       
-      if (categories.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>暂无支出数据</p></div>';
-        return;
-      }
-
-      container.innerHTML = categories.map(cat => `
-        <div class="category-item">
-          <div class="category-name">${cat.category}</div>
-          <div class="category-amount" style="color: #ef4444;">${formatMoney(cat.amount)}</div>
-          <div class="category-percentage">${cat.percentage}%</div>
-        </div>
-      `).join('');
+      refreshTransactions('all');
+      refreshSummary();
+      refreshFireInfo();
+      
+      closeDeleteConfirmModal();
     }
 
-    async function openAddModal() {
-      window.editingTransactionId = null;
-      await refreshDepositAccounts();
+    function openAddModal() {
+      editingTransactionId = null;
+      refreshDepositAccounts();
       document.getElementById('modal-overlay').classList.add('active');
       document.getElementById('date-input').value = new Date().toISOString().split('T')[0];
       document.getElementById('capital-balance-input').value = '';
@@ -1933,116 +1852,9 @@
       }
     }
 
-    function getReturnRate() {
-      switch(userRiskProfile) {
-        case 'conservative': return 0.025;
-        case 'aggressive': return 0.045;
-        case 'moderate':
-        default: return 0.035;
-      }
-    }
-
     async function refreshFireInfo() {
       try {
-        console.log('refreshFireInfo 开始执行');
-        
-        const transactions = await fetchData('/transactions');
-        const incomeTransactions = transactions.filter(t => t.type === 'income');
-        
-        const monthlyData = {};
-        incomeTransactions.forEach(t => {
-          const date = new Date(t.date);
-          const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
-          const capitalBalance = t.capitalBalance || t.amount || 0;
-          const investmentBalance = t.investmentBalance || 0;
-          
-          if (!monthlyData[monthKey]) {
-            monthlyData[monthKey] = { totalCapital: 0, totalInvestment: 0 };
-          }
-          monthlyData[monthKey].totalCapital += capitalBalance;
-          monthlyData[monthKey].totalInvestment += investmentBalance;
-        });
-        
-        const monthsAsc = Object.keys(monthlyData).sort((a, b) => a.localeCompare(b));
-        const currentCapital = monthsAsc.length > 0 ? monthlyData[monthsAsc[monthsAsc.length - 1]].totalCapital : 0;
-        
-        const fireTarget = userAnnualExpense > 0 ? (userAnnualExpense / getReturnRate()) : 0;
-        const remainingAmount = fireTarget - currentCapital;
-        
-        let annualSavings = 0;
-        let annualRate = getReturnRate();
-        const monthCount = monthsAsc.length;
-        
-        if (monthCount <= 1) {
-          annualSavings = (userAnnualIncome || 0) - (userAnnualExpense || 0);
-          annualRate = getReturnRate();
-        } else if (monthCount >= 2 && monthCount <= 11) {
-          let totalMonthlySavings = 0;
-          for (let i = 1; i < monthsAsc.length; i++) {
-            const currentMonth = monthsAsc[i];
-            const prevMonth = monthsAsc[i - 1];
-            const capitalChange = monthlyData[currentMonth].totalCapital - monthlyData[prevMonth].totalCapital;
-            const investmentIncome = monthlyData[currentMonth].totalInvestment;
-            totalMonthlySavings += capitalChange - investmentIncome;
-          }
-          annualSavings = (totalMonthlySavings / (monthCount - 1)) * 12;
-          
-          if (monthCount >= 3) {
-            let product = 1;
-            for (let i = 1; i < monthsAsc.length; i++) {
-              const currentMonth = monthsAsc[i];
-              const prevMonth = monthsAsc[i - 1];
-              const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-              product *= (1 + rate);
-            }
-            annualRate = Math.pow(product, 12 / (monthCount - 1)) - 1;
-          }
-        } else {
-          const recent12MonthsAsc = monthsAsc.slice(-12);
-          let totalMonthlySavings = 0;
-          for (let i = 1; i < recent12MonthsAsc.length; i++) {
-            const currentMonth = recent12MonthsAsc[i];
-            const prevMonth = recent12MonthsAsc[i - 1];
-            const capitalChange = monthlyData[currentMonth].totalCapital - monthlyData[prevMonth].totalCapital;
-            const investmentIncome = monthlyData[currentMonth].totalInvestment;
-            totalMonthlySavings += capitalChange - investmentIncome;
-          }
-          annualSavings = totalMonthlySavings;
-          
-          let product = 1;
-          for (let i = 1; i < recent12MonthsAsc.length; i++) {
-            const currentMonth = recent12MonthsAsc[i];
-            const prevMonth = recent12MonthsAsc[i - 1];
-            if (monthlyData[prevMonth].totalCapital > 0) {
-              const rate = monthlyData[currentMonth].totalInvestment / monthlyData[prevMonth].totalCapital;
-              product *= (1 + rate);
-            }
-          }
-          annualRate = product - 1;
-        }
-        
-        let yearsToFire = '--';
-        if (fireTarget > 0 && currentCapital >= 0 && annualRate >= 0) {
-          const A = currentCapital;
-          const S = annualSavings;
-          const r = annualRate;
-          const F = fireTarget;
-          
-          if (r > 0 && S >= 0) {
-            const numerator = Math.log((F * r + S) / (A * r + S));
-            const denominator = Math.log(1 + r);
-            if (denominator !== 0 && !isNaN(numerator) && !isNaN(denominator)) {
-              yearsToFire = Math.max(0, numerator / denominator).toFixed(1);
-            }
-          } else if (S > 0 && r === 0) {
-            yearsToFire = Math.max(0, (F - A) / S).toFixed(1);
-          }
-        }
-        
-        const progressPercentage = fireTarget > 0 ? Math.min(100, (currentCapital / fireTarget * 100)).toFixed(1) : 0;
-        
-        const fireTargetInWan = (fireTarget / 10000).toFixed(2);
-        const remainingInWan = (remainingAmount / 10000).toFixed(2);
+        const fireInfo = window.frontendService.getFireProgressInfo();
         
         const fireTargetEl = document.getElementById('fire-target');
         const firePercentageEl = document.getElementById('fire-percentage');
@@ -2050,34 +1862,31 @@
         const fireRemainingEl = document.getElementById('fire-remaining');
         const yearsText = document.getElementById('fire-years');
         
-        if (fireTargetEl) fireTargetEl.textContent = `¥ ${fireTargetInWan}（万元）`;
-        if (firePercentageEl) firePercentageEl.textContent = progressPercentage + '%';
-        if (fireProgressEl) fireProgressEl.style.width = progressPercentage + '%';
-        if (fireRemainingEl) fireRemainingEl.textContent = `距离 FIRE 还需: ¥ ${remainingInWan}（万元）`;
+        if (fireTargetEl) fireTargetEl.textContent = `${fireInfo.fireTargetInWan}万`;
+        if (firePercentageEl) firePercentageEl.textContent = fireInfo.progressPercentage + '%';
+        if (fireProgressEl) fireProgressEl.style.width = fireInfo.progressPercentage + '%';
+        if (fireRemainingEl) fireRemainingEl.textContent = `距离 FIRE 还需（万元）: ${fireInfo.remainingInWan}万`;
         
         if (yearsText) {
-          if (remainingAmount <= 0) {
+          if (fireInfo.remainingAmount <= 0) {
             yearsText.innerHTML = '🎉 <span style="font-size: 1.4rem;">已达成</span> FIRE 目标！';
-          } else if (yearsToFire === '--' || parseFloat(yearsToFire) >= 100) {
+          } else if (fireInfo.yearsToFire === '--' || (fireInfo.yearsToFire !== '--' && parseFloat(fireInfo.yearsToFire) >= 100)) {
             yearsText.innerHTML = '还需 <span style="font-size: 1.4rem;">--</span> 年实现 FIRE';
           } else {
-            yearsText.innerHTML = `还需 <span style="font-size: 1.4rem;">${yearsToFire}</span> 年实现 FIRE`;
+            yearsText.innerHTML = `还需 <span style="font-size: 1.4rem;">${fireInfo.yearsToFire}</span> 年实现 FIRE`;
           }
         }
-        
-        console.log('refreshFireInfo 执行完成');
       } catch (error) {
-        console.error('refreshFireInfo 执行失败:', error);
-        alert('刷新 FIRE 信息失败: ' + error.message);
+        console.error('刷新 FIRE 信息失败:', error.message);
       }
     }
+    window.refreshFireInfo = refreshFireInfo;
 
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         
-        // 只在全部收入标签页显示添加记录按钮
         const addBtn = document.querySelector('.btn-add');
         if (tab.dataset.tab === 'all') {
           addBtn.style.display = 'block';
@@ -2089,7 +1898,98 @@
       });
     });
 
-    let editingAccountId = null;
+    function toggleDataDropdown() {
+      const dropdown = document.getElementById('data-dropdown');
+      if (dropdown) {
+        dropdown.classList.toggle('show');
+      }
+    }
+
+    document.addEventListener('click', function(event) {
+      const dropdown = document.getElementById('data-dropdown');
+      if (dropdown && !dropdown.contains(event.target)) {
+        dropdown.classList.remove('show');
+      }
+    });
+
+    function handleExportData() {
+      const exportData = window.frontendService.exportData();
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const now = new Date();
+      const timestamp = now.getFullYear() + 
+        String(now.getMonth() + 1).padStart(2, '0') + 
+        String(now.getDate()).padStart(2, '0') + '_' + 
+        String(now.getHours()).padStart(2, '0') + 
+        String(now.getMinutes()).padStart(2, '0') + 
+        String(now.getSeconds()).padStart(2, '0');
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'firely_backup_' + timestamp + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      document.getElementById('data-dropdown').classList.remove('show');
+      alert('数据导出成功！文件已下载。');
+    }
+
+    function triggerImportData() {
+      document.getElementById('import-file-input').click();
+      document.getElementById('data-dropdown').classList.remove('show');
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const exportData = JSON.parse(e.target.result);
+          
+          if (!exportData.data) {
+            alert('文件格式错误，请选择正确的备份文件');
+            return;
+          }
+
+          const transactions = exportData.data.transactions || [];
+          const accounts = exportData.data.depositAccounts || [];
+          
+          const confirmMessage = `即将导入数据：
+- 交易记录：${transactions.length} 条
+- 资金账户：${accounts.length} 个
+
+⚠️ 警告：导入将覆盖当前所有数据！
+
+是否继续？`;
+
+          if (!confirm(confirmMessage)) {
+            event.target.value = '';
+            return;
+          }
+
+          const result = window.frontendService.importData(exportData);
+          
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert('导入失败：' + result.message);
+          }
+        } catch (error) {
+          alert('文件格式错误：' + error.message);
+        }
+        
+        event.target.value = '';
+      };
+      
+      reader.readAsText(file);
+    }
 
     function openUserInfoModal() {
       document.getElementById('edit-annual-income').value = userAnnualIncome ? (userAnnualIncome / 10000).toFixed(1) : '';
@@ -2103,29 +2003,38 @@
       const modal = document.getElementById('user-info-modal');
       if (modal) {
         modal.classList.remove('active');
-        console.log('用户信息模态框已关闭');
-      } else {
-        console.error('用户信息模态框未找到');
       }
     }
 
-    window.saveUserInfoEdit = async function() {
+    window.saveUserInfoEdit = function() {
       try {
-        const annualIncome = parseFloat(document.getElementById('edit-annual-income').value);
-        if (!annualIncome || annualIncome <= 0) {
-          alert('请输入有效的家庭年收入（大于0）');
+        const annualIncomeInput = document.getElementById('edit-annual-income');
+        const annualExpenseInput = document.getElementById('edit-annual-expense');
+        const riskProfileSelect = document.getElementById('edit-risk-profile');
+        
+        if (!annualIncomeInput || !annualExpenseInput || !riskProfileSelect) {
+          console.error('表单元素未找到');
           return;
         }
         
-        const annualExpense = parseFloat(document.getElementById('edit-annual-expense').value);
-        if (!annualExpense || annualExpense < 0) {
-          alert('请输入有效的家庭年支出（大于等于0）');
+        const annualIncomeValue = annualIncomeInput.value.trim();
+        const annualExpenseValue = annualExpenseInput.value.trim();
+        const riskProfile = riskProfileSelect.value;
+        
+        const annualIncome = parseFloat(annualIncomeValue);
+        if (isNaN(annualIncome) || annualIncome <= 0) {
+          console.error('请输入有效的家庭年收入（大于0）');
           return;
         }
         
-        const riskProfile = document.getElementById('edit-risk-profile').value;
+        const annualExpense = parseFloat(annualExpenseValue);
+        if (isNaN(annualExpense) || annualExpense < 0) {
+          console.error('请输入有效的家庭年支出（大于等于0）');
+          return;
+        }
+        
         if (!riskProfile) {
-          alert('请选择您的家庭理财情况');
+          console.error('请选择您的家庭理财情况');
           return;
         }
         
@@ -2133,20 +2042,17 @@
         userAnnualExpense = annualExpense * 10000;
         userRiskProfile = riskProfile;
         
-        const userInfo = { 
+        window.frontendService.saveUserInfo({
           gender: userGender,
           annualIncome: userAnnualIncome,
           annualExpense: userAnnualExpense,
           riskProfile: userRiskProfile
-        };
-        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+        });
         
         closeUserInfoModal();
-        await refreshFireInfo();
-        alert('个人信息已更新！');
+        refreshFireInfo();
       } catch (error) {
-        console.error('保存个人信息失败:', error);
-        alert('保存个人信息失败: ' + error.message);
+        console.error('保存个人信息失败:', error.message);
       }
     };
 
@@ -2159,13 +2065,19 @@
       document.getElementById('deposit-list-modal').classList.remove('active');
     }
 
-    async function refreshDepositAccounts() {
-      const accounts = await fetchData('/deposit-accounts');
+    function refreshDepositAccounts() {
+      const accounts = window.frontendService.getAllDepositAccounts();
       const container = document.getElementById('deposit-list');
-      
       const depositSelect = document.getElementById('deposit-account-select');
-      depositSelect.innerHTML = '<option value="">请选择资金存放地</option>' + 
-        accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      
+      if (depositSelect) {
+        depositSelect.innerHTML = '<option value="">请选择资金存放地</option>' + 
+          accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      }
+
+      if (!container) {
+        return;
+      }
 
       if (accounts.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>暂无资金账户，请添加</p></div>';
@@ -2188,6 +2100,7 @@
         </div>
       `).join('');
     }
+    window.refreshDepositAccounts = refreshDepositAccounts;
 
     function getDepositTypeLabel(type) {
       const labels = {
@@ -2227,7 +2140,7 @@
       document.getElementById('deposit-modal').classList.remove('active');
     }
 
-    async function submitDepositAccount() {
+    function submitDepositAccount() {
       try {
         const nameInput = document.getElementById('deposit-name-input');
         const repaymentSelect = document.getElementById('deposit-repayment-select');
@@ -2253,42 +2166,20 @@
           return;
         }
 
-        const postData = { 
+        const accountData = { 
           name, 
           type: isRepayment ? 'bank' : 'other',
           repaymentDay 
         };
         
-        console.log('Submitting deposit account:', postData);
-
-        const response = await fetch('/api/deposit-accounts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(postData)
-        });
-
-        console.log('Response status:', response.status);
+        window.frontendService.addDepositAccount(accountData);
         
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Account added:', result);
-          closeDepositModal();
-          await refreshDepositAccounts();
-          alert('账户添加成功！');
-        } else {
-          let errorMessage = '添加失败';
-          try {
-            const data = await response.json();
-            errorMessage = data.error || '添加失败';
-          } catch (e) {
-            errorMessage = `HTTP错误: ${response.status}`;
-          }
-          console.error('Error adding account:', errorMessage);
-          alert(errorMessage);
-        }
+        closeDepositModal();
+        refreshDepositAccounts();
+        alert('账户添加成功！');
       } catch (error) {
         console.error('Error submitting deposit account:', error);
-        alert('网络错误: ' + error.message);
+        alert('操作失败: ' + error.message);
       }
     }
 
@@ -2303,7 +2194,7 @@
       document.getElementById('repayment-modal').classList.remove('active');
     }
 
-    async function submitRepaymentDay() {
+    function submitRepaymentDay() {
       const day = parseInt(document.getElementById('edit-repayment-day').value);
       
       if (!day || day < 1 || day > 31) {
@@ -2311,65 +2202,103 @@
         return;
       }
 
-      try {
-        const response = await fetch(`/api/deposit-accounts/${editingAccountId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repaymentDay: day })
-        });
-
-        if (response.ok) {
-          closeRepaymentModal();
-          await refreshDepositAccounts();
-        } else {
-          alert('修改失败');
-        }
-      } catch (error) {
-        alert('网络错误');
-      }
+      window.frontendService.updateDepositAccount(editingAccountId, { repaymentDay: day });
+      
+      closeRepaymentModal();
+      refreshDepositAccounts();
     }
 
-    async function deleteDepositAccount(id) {
+    function deleteDepositAccount(id) {
       if (!confirm('确定要删除这个账户吗？')) {
         return;
       }
 
-      try {
-        const response = await fetch(`/api/deposit-accounts/${id}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          await refreshDepositAccounts();
-        } else {
-          alert('删除失败');
-        }
-      } catch (error) {
-        alert('网络错误');
-      }
+      window.frontendService.deleteDepositAccount(id);
+      refreshDepositAccounts();
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const hasUserInfo = getUserInfo();
-      if (hasUserInfo) {
-        document.getElementById('welcome-modal').style.display = 'none';
-        refreshData();
+    let selectedAccount = null;
+
+    function handlePieClick(accountName) {
+      if (selectedAccount === accountName) {
+        selectedAccount = null;
       } else {
-        document.getElementById('gender-male').style.borderColor = '#667eea';
+        selectedAccount = accountName;
+      }
+      
+      const detailItems = document.querySelectorAll('[data-account]');
+      detailItems.forEach(item => {
+        const itemAccount = item.getAttribute('data-account');
+        if (selectedAccount && itemAccount !== selectedAccount) {
+          item.style.display = 'none';
+        } else {
+          item.style.display = 'flex';
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('========== DOMContentLoaded 触发 ==========');
+      
+      console.log('frontendService:', window.frontendService);
+      console.log('localStorageService:', window.localStorageService);
+      
+      try {
+        const userInfo = window.frontendService.getUserInfo();
+        console.log('User info:', userInfo);
+        
+        if (userInfo && userInfo.gender) {
+          userGender = userInfo.gender || 'male';
+          userAnnualIncome = userInfo.annualIncome || 0;
+          userAnnualExpense = userInfo.annualExpense || 50000;
+          userRiskProfile = userInfo.riskProfile || '';
+          
+          document.getElementById('welcome-modal').style.display = 'none';
+          refreshData();
+        }
+      } catch (e) {
+        console.error('Error getting user info:', e);
+      }
+      
+      const saveUserInfoBtn = document.getElementById('save-user-info-btn');
+      console.log('saveUserInfoBtn:', saveUserInfoBtn);
+      console.log('window.saveUserInfo:', window.saveUserInfo);
+      if (saveUserInfoBtn && window.saveUserInfo) {
+        saveUserInfoBtn.addEventListener('click', window.saveUserInfo);
+        console.log('saveUserInfo click listener added');
+      }
+      
+      const skipWelcomeBtn = document.getElementById('skip-welcome-btn');
+      console.log('skipWelcomeBtn:', skipWelcomeBtn);
+      console.log('window.skipWelcome:', window.skipWelcome);
+      if (skipWelcomeBtn && window.skipWelcome) {
+        skipWelcomeBtn.addEventListener('click', window.skipWelcome);
+        console.log('skipWelcome click listener added');
       }
       
       document.addEventListener('click', (event) => {
         const target = event.target;
-        const transactionItem = target.closest('.transaction-item');
-        if (transactionItem) {
-          const idMatch = transactionItem.getAttribute('onclick')?.match(/openEditModal\((\d+)\)/);
+        
+        const editButton = target.closest('[onclick*="openEditModal"]');
+        if (editButton) {
+          const idMatch = editButton.getAttribute('onclick')?.match(/openEditModal\((\d+)\)/);
           if (idMatch) {
             const transactionId = parseInt(idMatch[1]);
-            console.log('修改按钮被点击，交易ID:', transactionId);
             window.openEditModal(transactionId);
           }
         }
+        
+        const deleteButton = target.closest('[onclick*="deleteTransaction"]');
+        if (deleteButton) {
+          const idMatch = deleteButton.getAttribute('onclick')?.match(/deleteTransaction\((\d+)\)/);
+          if (idMatch) {
+            const transactionId = parseInt(idMatch[1]);
+            deleteTransaction(transactionId);
+          }
+        }
       });
+      
+      console.log('========== DOMContentLoaded 处理完成 ==========');
     });
   </script>
 </body>

@@ -1,9 +1,9 @@
 ---
 name: "fire-budgeting-dev"
-description: "钱多多FIRE理财应用开发技能。当用户询问项目架构、功能模块、计算公式、API接口，或需要开发/调试/维护此FIRE理财应用时调用。"
+description: "FIRELY财务独立目标管理应用开发技能。当用户询问项目架构、功能模块、计算公式、API接口，或需要开发/调试/维护此FIRELY应用时调用。"
 ---
 
-# 钱多多 FIRE 理财应用开发技能
+# FIRELY 财务独立目标管理应用开发技能
 
 ## 项目概述
 
@@ -11,20 +11,21 @@ description: "钱多多FIRE理财应用开发技能。当用户询问项目架�
 
 ## 技术栈
 
-- **前端**：HTML, CSS, JavaScript (单文件 `public/index.html`)
-- **后端**：Node.js, Express, TypeScript
-- **数据库**：SQLite (better-sqlite3)
-- **运行环境**：Node.js 18+
+- **前端**：HTML, CSS, JavaScript
+- **数据存储**：localStorage（浏览器本地存储）
+- **静态服务器**：http-server
+- **测试框架**：Jest + jsdom
+- **运行环境**：现代浏览器（Chrome、Firefox、Safari、Edge）
 
 ## 核心功能模块
 
 ### 1. Dashboard 核心指标
 | 卡片 | 数据来源 | 计算方式 |
 |------|---------|---------|
-| 资金总余额 | transactions表 | 本月资金余额（最新月份） |
-| 年度理财总收益 | transactions表 | 本年所有月份理财收益之和 |
-| 月度结余 | transactions表 | 本月余额 - 上月余额 |
-| 年度结余 | transactions表 | 本年余额 - 去年余额 |
+| 资金总余额 | localStorage | 本月资金余额（最新月份） |
+| 年度理财总收益 | localStorage | 本年所有月份理财收益之和 |
+| 月度结余 | localStorage | 本月余额 - 上月余额 |
+| 年度结余 | localStorage | 本年余额 - 去年余额 |
 
 ### 2. 健康状态监控
 | 状态卡片 | 指标 | 阈值 |
@@ -38,7 +39,7 @@ description: "钱多多FIRE理财应用开发技能。当用户询问项目架�
 - **所需时间** = ln((F×r+S)/(A×r+S)) / ln(1+r)
 
 ### 4. 资金分布
-- 数据来源：transactions表（type='income'）
+- 数据来源：localStorage（交易记录）
 - 只显示最近一个月的账户数据
 - 按金额降序排列，大占比聚集显示
 
@@ -46,6 +47,11 @@ description: "钱多多FIRE理财应用开发技能。当用户询问项目架�
 - CRUD操作：添加、编辑、删除收入记录
 - 按月分组，每组显示资金总余额和理财总收益
 - 月收益率 = 本月理财收益 / 上月资金余额
+
+### 6. 数据导入导出
+- **导出**：将所有数据（交易记录、资金账户、用户信息）导出为 JSON 文件
+- **导入**：从 JSON 文件恢复数据，支持跨终端数据迁移
+- **版本兼容性**：新版本可导入旧版本数据
 
 ## 计算公式
 
@@ -74,46 +80,6 @@ K = ln((F×r+S)/(A×r+S)) / ln(1+r)
 ```
 - A=当前资产, S=年储蓄, r=年收益率, F=FIRE目标
 
-## API 接口
-
-### 资金账户 `/api/deposit-accounts`
-- GET: 获取所有账户
-- POST: 添加账户
-- PUT /:id: 更新账户
-- DELETE /:id: 删除账户
-
-### 交易记录 `/api/transactions`
-- GET: 获取所有交易
-- POST: 添加交易
-- PUT /:id: 更新交易
-- DELETE /:id: 删除交易
-
-### 数据汇总 `/api/summary`
-- GET: 获取汇总数据
-
-## 数据库模型
-
-### deposit_accounts
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| name | TEXT | 账户名称 |
-| type | TEXT | 账户类型 |
-| repayment_day | INTEGER | 还款日 |
-
-### transactions
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| type | TEXT | 类型(income/expense) |
-| category | TEXT | 分类 |
-| amount | REAL | 金额 |
-| capital_balance | REAL | 资金余额 |
-| investment_balance | REAL | 理财收益 |
-| description | TEXT | 描述 |
-| date | TEXT | 日期 |
-| deposit_account_id | INTEGER | 账户ID |
-
 ## 用户数据存储
 
 用户信息存储在浏览器 `localStorage` 中：
@@ -125,13 +91,26 @@ K = ln((F×r+S)/(A×r+S)) / ln(1+r)
 }
 ```
 
-## 安全提取率
+## 数据导入导出
 
-| 类型 | 利率 | 适用场景 |
-|------|------|---------|
-| 保守 | 2.5% | 债券为主、低波动组合 |
-| 中性 | 3.5% | 股债平衡、低费率全球指数基金 |
-| 积极 | 4.5% | 偏股型组合、愿意承担较大波动 |
+### 导出格式
+```json
+{
+  "appVersion": "2.0",
+  "exportTime": "2026-06-30T10:00:00.000Z",
+  "data": {
+    "transactions": [...],
+    "depositAccounts": [...],
+    "userInfo": {...},
+    "nextIds": {...}
+  }
+}
+```
+
+### 导入规则
+1. 版本检查：导入文件版本必须 ≤ 当前应用版本（2.0）
+2. 数据覆盖：导入会清除现有数据并替换为导入数据
+3. 格式验证：必须包含 `data` 字段，否则导入失败
 
 ## 常用命令
 
@@ -139,12 +118,21 @@ K = ln((F×r+S)/(A×r+S)) / ln(1+r)
 # 安装依赖
 npm install
 
-# 开发模式启动
+# 开发模式启动（http-server）
 npm run dev
 
-# 生产构建
+# 构建（复制 public 到 build）
 npm run build
 
-# 生产启动
-npm start
+# 运行所有测试
+npm test
+
+# 仅运行P0核心测试
+npm run test:p0
+
+# 仅运行导入导出测试
+npm run test:io
+
+# 监听模式运行测试
+npm run test:watch
 ```
