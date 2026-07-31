@@ -29,6 +29,8 @@ const currentMonthDate = `${currentMonthKey}-30`;
 
 function getPrevMonthDate(monthsAgo) {
   const date = new Date();
+  // 先设置为月初，避免 setMonth 时因日期溢出导致月份错误
+  date.setDate(1);
   date.setMonth(date.getMonth() - monthsAgo);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
