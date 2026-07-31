@@ -4,8 +4,8 @@
   "description": "FIRELY - 财务独立目标管理系统（纯前端版）",
   "main": "public/index.html",
   "scripts": {
-    "dev": "http-server public -p 3000 -o -c-1",
-    "build": "cp -r public build",
+    "dev": "http-server src -p 3000 -o -c-1",
+    "build": "rm -rf public && cp -r src public",
     "deploy": "npm run build",
     "test": "jest",
     "test:p0": "jest P0.test.js",
