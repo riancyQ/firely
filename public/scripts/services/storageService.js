@@ -220,4 +220,4 @@ class LocalStorageService {
 }
 
 const localStorageService = new LocalStorageService();
-window.localStorageService = localStorageService;
+window.storageService = localStorageService;

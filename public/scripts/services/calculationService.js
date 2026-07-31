@@ -1,55 +1,18 @@
-class FrontendService {
+class CalculationService {
+  constructor(storageService) {
+    this.storageService = storageService;
+  }
+
   getAllTransactions() {
-    return localStorageService.getTransactions();
-  }
-
-  getTransactionsByType(type) {
-    const transactions = this.getAllTransactions();
-    return transactions.filter(t => t.type === type);
-  }
-
-  getTransactionById(id) {
-    return localStorageService.getTransactionById(id);
-  }
-
-  addTransaction(transaction) {
-    return localStorageService.addTransaction(transaction);
-  }
-
-  updateTransaction(id, transaction) {
-    return localStorageService.updateTransaction(id, transaction);
-  }
-
-  deleteTransaction(id) {
-    return localStorageService.deleteTransaction(id);
+    return this.storageService.getTransactions();
   }
 
   getAllDepositAccounts() {
-    return localStorageService.getDepositAccounts();
-  }
-
-  getDepositAccountById(id) {
-    return localStorageService.getDepositAccountById(id);
-  }
-
-  addDepositAccount(account) {
-    return localStorageService.addDepositAccount(account);
-  }
-
-  updateDepositAccount(id, account) {
-    return localStorageService.updateDepositAccount(id, account);
-  }
-
-  deleteDepositAccount(id) {
-    return localStorageService.deleteDepositAccount(id);
+    return this.storageService.getDepositAccounts();
   }
 
   getUserInfo() {
-    return localStorageService.getUserInfo();
-  }
-
-  saveUserInfo(userInfo) {
-    return localStorageService.saveUserInfo(userInfo);
+    return this.storageService.getUserInfo();
   }
 
   getBalanceSummary() {
@@ -275,13 +238,11 @@ class FrontendService {
   }
 
   formatMoney(amount) {
-    const amountInWan = amount / 10000;
-    return '¥ ' + amountInWan.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' 万';
+    return window.formatters.formatMoney(amount);
   }
 
   formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
+    return window.formatters.formatDate(dateStr);
   }
 
   getCapitalChartData() {
@@ -313,7 +274,7 @@ class FrontendService {
     for (let i = 1; i < sortedMonths.length; i++) {
       const current = sortedMonths[i];
       const previous = sortedMonths[i - 1];
-      const growth = ((monthlyData[current].total - monthlyData[previous].total) / monthlyData[previous].total * 100).toFixed(2);
+      const growth = ((monthlyData[current].total - monthlyData[previous].total) / monthlyData[previous].total * 100).toFixed(1);
       growthRates[current] = parseFloat(growth);
     }
     
@@ -326,7 +287,7 @@ class FrontendService {
         .filter(k => k.startsWith(String(new Date().getFullYear() - 1)))
         .reduce((sum, k) => sum + monthlyData[k].total, 0);
       if (lastYearTotal > 0) {
-        annualGrowth = ((currentYearTotal - lastYearTotal) / lastYearTotal * 100).toFixed(2) + '%';
+        annualGrowth = ((currentYearTotal - lastYearTotal) / lastYearTotal * 100).toFixed(1) + '%';
       }
     }
 
@@ -371,7 +332,7 @@ class FrontendService {
         monthlyData[monthKey].rate = 'N/A';
       } else {
         const prevCapital = monthlyData[prevMonthKey].totalCapital;
-        monthlyData[monthKey].rate = prevCapital > 0 ? (monthlyData[monthKey].totalInvestment / prevCapital * 100).toFixed(2) : '0.00';
+        monthlyData[monthKey].rate = prevCapital > 0 ? (monthlyData[monthKey].totalInvestment / prevCapital * 100).toFixed(1) : '0.0';
       }
     });
     
@@ -424,15 +385,7 @@ class FrontendService {
   }
 
   getDepositTypeLabel(type) {
-    const labels = {
-      bank: '🏦 还款账户',
-      other: '💼 普通账户',
-      alipay: '📱 支付宝',
-      jd: '🛒 京东金融',
-      wechat: '💬 微信余额',
-      securities: '📈 证券公司'
-    };
-    return labels[type] || type;
+    return window.formatters.getDepositTypeLabel(type);
   }
 
   getAnnualRate() {
@@ -469,7 +422,7 @@ class FrontendService {
         }
       }
       const annualRate = Math.pow(product, 12 / (n - 1)) - 1;
-      return { rate: (annualRate * 100).toFixed(2) + '%', value: annualRate };
+      return { rate: (annualRate * 100).toFixed(1) + '%', value: annualRate };
     } else {
       const recent12MonthsAsc = monthsAsc.slice(-12);
       let product = 1;
@@ -482,7 +435,7 @@ class FrontendService {
         }
       }
       const annualRate = product - 1;
-      return { rate: (annualRate * 100).toFixed(2) + '%', value: annualRate };
+      return { rate: (annualRate * 100).toFixed(1) + '%', value: annualRate };
     }
   }
 
@@ -582,7 +535,7 @@ class FrontendService {
     const latestByAccount = {};
     displayTransactions.forEach(t => {
       const accountName = t.accountName || '未分类';
-      if (!latestByAccount[accountName] || new Date(t.date) > new Date(latestByAccount[accountName].date)) {
+      if (!latestByAccount[accountName] || new Date(t.date) >= new Date(latestByAccount[accountName].date)) {
         latestByAccount[accountName] = t;
       }
     });
@@ -656,23 +609,27 @@ class FrontendService {
     }
     
     let yearsToFire = '--';
-    if (fireTarget > 0 && currentCapital >= 0 && annualRate >= 0 && annualSavings > 0) {
+    if (fireTarget > 0 && currentCapital >= 0 && annualSavings > 0) {
       const A = currentCapital;
       const S = annualSavings;
       const r = annualRate;
       const F = fireTarget;
       
-      if (r > 0) {
-        const denominator = A * r + S;
-        if (denominator > 0) {
-          const numerator = Math.log((F * r + S) / denominator);
-          const logDenominator = Math.log(1 + r);
-          if (logDenominator !== 0 && !isNaN(numerator) && !isNaN(logDenominator)) {
-            yearsToFire = Math.max(0, numerator / logDenominator).toFixed(1);
+      if (r >= 0) {
+        if (r > 0) {
+          const denominator = A * r + S;
+          if (denominator > 0) {
+            const numerator = Math.log((F * r + S) / denominator);
+            const logDenominator = Math.log(1 + r);
+            if (logDenominator !== 0 && !isNaN(numerator) && !isNaN(logDenominator)) {
+              yearsToFire = Math.max(0, numerator / logDenominator).toFixed(1);
+            }
           }
+        } else if (r === 0) {
+          yearsToFire = Math.max(0, (F - A) / S).toFixed(1);
         }
-      } else if (r === 0) {
-        yearsToFire = Math.max(0, (F - A) / S).toFixed(1);
+      } else {
+        yearsToFire = 'loss';
       }
     }
     
@@ -796,15 +753,7 @@ class FrontendService {
       yearsToFire: Math.round(yearsToFire * 100) / 100
     };
   }
-
-  exportData() {
-    return localStorageService.exportData();
-  }
-
-  importData(exportData) {
-    return localStorageService.importData(exportData);
-  }
 }
 
-const frontendService = new FrontendService();
-window.frontendService = frontendService;
+const calculationService = new CalculationService(localStorageService);
+window.calculationService = calculationService;
