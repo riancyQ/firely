@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getCurrentMonthDate, getLastMonthDate } = require('../helpers/dateHelper');
 
 const storageServiceCode = fs.readFileSync(
   path.join(__dirname, '../../src/scripts/services/storageService.js'),
@@ -21,13 +22,8 @@ eval(calculationServiceCode);
 const storage = window.storageService;
 const calcService = window.calculationService;
 
-const now = new Date();
-const currentYear = now.getFullYear();
-const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-const currentMonthDate = `${currentYear}-${currentMonth}-30`;
-const lastMonthDate = now.getMonth() === 1 
-  ? `${currentYear - 1}-12-31` 
-  : `${currentYear}-${String(now.getMonth()).padStart(2, '0')}-28`;
+const currentMonthDate = getCurrentMonthDate();
+const lastMonthDate = getLastMonthDate();
 
 describe('健康状态监控', () => {
   beforeEach(() => {

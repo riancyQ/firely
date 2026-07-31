@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getCurrentMonthDate, getLastMonthDate, getPrevMonthDate } = require('../helpers/dateHelper');
 
 const storageServiceCode = fs.readFileSync(
   path.join(__dirname, '../../src/scripts/services/storageService.js'),
@@ -21,13 +22,8 @@ eval(calculationServiceCode);
 const storage = window.storageService;
 const calcService = window.calculationService;
 
-const now = new Date();
-const currentYear = now.getFullYear();
-const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-const currentMonthDate = `${currentYear}-${currentMonth}-30`;
-const lastMonthDate = now.getMonth() === 1 
-  ? `${currentYear - 1}-12-31` 
-  : `${currentYear}-${String(now.getMonth()).padStart(2, '0')}-28`;
+const currentMonthDate = getCurrentMonthDate();
+const lastMonthDate = getLastMonthDate();
 
 describe('Dashboard 核心指标', () => {
   beforeEach(() => {
@@ -90,10 +86,7 @@ describe('Dashboard 核心指标', () => {
     });
 
     test('累计本年各月理财收益', () => {
-      const prevMonth = now.getMonth() - 1;
-      const prevMonthStr = prevMonth === 0 ? '12' : String(prevMonth).padStart(2, '0');
-      const prevYear = prevMonth === 0 ? currentYear - 1 : currentYear;
-      const prevMonthDateStr = `${prevYear}-${prevMonthStr}-28`;
+      const prevMonthDateStr = getPrevMonthDate(1).date;
       
       storage.addTransaction({
         type: 'income', capitalBalance: 1000000, investmentBalance: 3000,

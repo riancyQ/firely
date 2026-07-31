@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getCurrentMonthKey, getCurrentMonthDate, getPrevMonthDate } = require('../helpers/dateHelper');
 
 const storageServiceCode = fs.readFileSync(
   path.join(__dirname, '../../src/scripts/services/storageService.js'),
@@ -21,21 +22,8 @@ eval(calculationServiceCode);
 const storage = window.storageService;
 const calcService = window.calculationService;
 
-const now = new Date();
-const currentYear = now.getFullYear();
-const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-const currentMonthKey = `${currentYear}-${currentMonth}`;
-const currentMonthDate = `${currentMonthKey}-30`;
-
-function getPrevMonthDate(monthsAgo) {
-  const date = new Date();
-  // 先设置为月初，避免 setMonth 时因日期溢出导致月份错误
-  date.setDate(1);
-  date.setMonth(date.getMonth() - monthsAgo);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return { key: `${year}-${month}`, date: `${year}-${month}-28` };
-}
+const currentMonthKey = getCurrentMonthKey();
+const currentMonthDate = getCurrentMonthDate();
 
 describe('理财收益', () => {
   beforeEach(() => {
