@@ -10,9 +10,14 @@
 
 | 图标 | 类型 | 状态 |
 |------|------|------|
-| 🧪 | 单元测试（Logic） | 已完成 323 用例 |
+| 🧪 | 单元测试（Logic） | ✅ 已完成 329 用例（全部通过） |
 | 🟨 | 浏览器交互测试（UI） | **待进行** |
 | 🟥 | 性能测试（Perf） | **待进行** |
+
+**最近修复**（2026-07-31）：
+- 修复 `setMonth` 日期边界 bug（当日期为月底时导致月份计算错误）
+- 影响文件：`tests/modules/investment-returns.test.js`、`tests/modules/capital-trend.test.js`
+- 解决方案：在 `setMonth` 前先调用 `setDate(1)`，确保月份计算正确
 
 ---
 
