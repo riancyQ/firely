@@ -15,9 +15,17 @@
 | 🟥 | 性能测试（Perf） | **待进行** |
 
 **最近修复**（2026-07-31）：
-- 修复 `setMonth` 日期边界 bug（当日期为月底时导致月份计算错误）
-- 影响文件：`tests/modules/investment-returns.test.js`、`tests/modules/capital-trend.test.js`
-- 解决方案：在 `setMonth` 前先调用 `setDate(1)`，确保月份计算正确
+1. **修复 setMonth 日期边界 bug**
+   - 问题：当日期为月底时，`setMonth` 因日期溢出导致月份计算错误
+   - 解决方案：在 `setMonth` 前先调用 `setDate(1)`，确保月份计算正确
+
+2. **修复测试日期处理的环境依赖问题**
+   - 问题：多个测试文件中 `lastMonthDate` 使用 `now.getMonth() === 1` 判断1月，但 JavaScript 中1月 `getMonth()` 返回0，导致1月时生成无效日期
+   - 影响文件：8个测试文件
+   - 解决方案：
+     - 创建共享工具文件 `tests/helpers/dateHelper.js`，使用固定基准时间（2026-07-15）
+     - 所有测试文件统一使用共享的日期工具函数
+     - 确保测试结果在任何时间运行都稳定一致
 
 ---
 
