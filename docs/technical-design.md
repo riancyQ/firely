@@ -34,12 +34,28 @@ firely/
 │           └── validators.js    # 输入验证
 ├── public/                      # 构建/部署目录（由工具生成）
 ├── tests/                       # 测试文件
+│   ├── services/                # 服务层测试
+│   │   ├── storageService.test.js  # 数据存储服务测试
+│   │   └── calculationService.test.js # 财务计算服务测试
+│   ├── modules/                 # 模块层测试
+│   │   ├── dashboard.test.js      # 看板模块测试
+│   │   ├── health-status.test.js  # 健康状态测试
+│   │   ├── fire-target.test.js    # FIRE目标测试
+│   │   ├── income-records.test.js # 收入记录测试
+│   │   ├── capital-distribution.test.js # 资金分布测试
+│   │   ├── capital-trend.test.js  # 资金趋势测试
+│   │   └── investment-returns.test.js # 理财收益测试
+│   ├── utils/                   # 工具层测试
+│   │   ├── formatters.test.js     # 格式化工具测试
+│   │   └── validators.test.js     # 验证工具测试
+│   ├── migration.test.js        # 迁移验证测试
 │   ├── P0.test.js               # P0核心测试用例
 │   ├── data-io.test.js          # 导入导出测试用例
 │   └── setup.js                 # 测试环境配置
 ├── docs/                        # 项目文档
-│   ├── product-spec.md          # 产品规格文档
-│   └── technical-design.md      # 技术设计文档
+│   ├── product-spec.md          # 产品规格文档（PRD）
+│   ├── technical-design.md      # 技术设计文档
+│   └── acceptance-checklist.md  # 功能验收清单
 ├── .trae/                       # Trae配置
 │   ├── rules/
 │   │   └── project_rules.md     # 开发规则
