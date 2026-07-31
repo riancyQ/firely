@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const localStorageServiceCode = fs.readFileSync(path.join(__dirname, '../public/js/localStorageService.js'), 'utf8');
-const frontendServiceCode = fs.readFileSync(path.join(__dirname, '../public/js/frontendService.js'), 'utf8');
+const storageServiceCode = fs.readFileSync(path.join(__dirname, '../src/scripts/services/storageService.js'), 'utf8');
+const calculationServiceCode = fs.readFileSync(path.join(__dirname, '../src/scripts/services/calculationService.js'), 'utf8');
 
-eval(localStorageServiceCode);
-eval(frontendServiceCode);
+eval(storageServiceCode);
+eval(calculationServiceCode);
 
 describe('P0核心测试', () => {
   beforeEach(() => {
@@ -14,7 +14,7 @@ describe('P0核心测试', () => {
 
   describe('getAnnualRate', () => {
     test('P0-001: 0个月数据返回N/A', () => {
-      const result = frontendService.getAnnualRate();
+      const result = calculationService.getAnnualRate();
       expect(result.rate).toBe('N/A');
       expect(result.value).toBeNull();
     });
@@ -23,7 +23,7 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1000000, investmentBalance: 0, date: '2026-05-31'
       });
-      const result = frontendService.getAnnualRate();
+      const result = calculationService.getAnnualRate();
       expect(result.rate).toBe('N/A');
       expect(result.value).toBeNull();
     });
@@ -35,7 +35,7 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1006000, investmentBalance: 6000, date: '2026-06-30'
       });
-      const result = frontendService.getAnnualRate();
+      const result = calculationService.getAnnualRate();
       expect(parseFloat(result.rate)).toBeCloseTo(7.44, 1);
       expect(result.value).toBeDefined();
     });
@@ -43,7 +43,7 @@ describe('P0核心测试', () => {
 
   describe('getAnnualSavings', () => {
     test('P0-004: 0个月数据返回N/A', () => {
-      const result = frontendService.getAnnualSavings();
+      const result = calculationService.getAnnualSavings();
       expect(result).toBe('N/A');
     });
 
@@ -54,14 +54,14 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1120000, investmentBalance: 6000, date: '2026-06-30'
       });
-      const result = frontendService.getAnnualSavings();
+      const result = calculationService.getAnnualSavings();
       expect(result).toBe(1368000);
     });
   });
 
   describe('getHealthStatus', () => {
     test('P0-007: 0个月数据返回灰色未知', () => {
-      const result = frontendService.getHealthStatus();
+      const result = calculationService.getHealthStatus();
       expect(result.status).toBe('unknown');
       expect(result.color).toBe('#6b7280');
       expect(result.statusText).toBe('❓ 未知');
@@ -75,7 +75,7 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1120000, investmentBalance: 6000, date: '2026-06-30'
       });
-      const result = frontendService.getHealthStatus();
+      const result = calculationService.getHealthStatus();
       expect(result.status).toBe('healthy');
       expect(result.color).toBe('#22c55e');
       expect(result.statusText).toBe('✅ 优秀');
@@ -84,7 +84,7 @@ describe('P0核心测试', () => {
 
   describe('getInvestmentHealthStatus', () => {
     test('P0-009: 0个月数据返回灰色未知', () => {
-      const result = frontendService.getInvestmentHealthStatus();
+      const result = calculationService.getInvestmentHealthStatus();
       expect(result.status).toBe('unknown');
       expect(result.color).toBe('#6b7280');
     });
@@ -96,7 +96,7 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1006000, investmentBalance: 6000, date: '2026-06-30'
       });
-      const result = frontendService.getInvestmentHealthStatus();
+      const result = calculationService.getInvestmentHealthStatus();
       expect(result.status).toBe('healthy');
       expect(result.color).toBe('#22c55e');
     });
@@ -128,7 +128,7 @@ describe('P0核心测试', () => {
   describe('getFireProgressInfo', () => {
     test('P0-015: 0个月数据使用用户输入计算', () => {
       localStorageService.saveUserInfo({ annualIncome: 600000, annualExpense: 350000, riskProfile: 'conservative' });
-      const result = frontendService.getFireProgressInfo();
+      const result = calculationService.getFireProgressInfo();
       expect(result.annualSavings).toBe(250000);
       expect(result.annualRate).toBe(0.025);
     });
@@ -141,7 +141,7 @@ describe('P0核心测试', () => {
       localStorageService.addTransaction({
         type: 'income', capitalBalance: 1120000, investmentBalance: 6000, date: '2026-06-30'
       });
-      const result = frontendService.getFireProgressInfo();
+      const result = calculationService.getFireProgressInfo();
       expect(result.annualSavings).toBe(1368000);
       expect(result.annualRate).toBeGreaterThan(0);
     });
