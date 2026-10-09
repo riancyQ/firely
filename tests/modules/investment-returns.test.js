@@ -14,13 +14,19 @@ const formattersCode = fs.readFileSync(
   path.join(__dirname, '../../src/scripts/utils/formatters.js'),
   'utf8'
 );
+const incomeRecordsCode = fs.readFileSync(
+  path.join(__dirname, '../../src/scripts/modules/incomeRecords.js'),
+  'utf8'
+);
 
 eval(storageServiceCode);
 eval(formattersCode);
 eval(calculationServiceCode);
+eval(incomeRecordsCode);
 
 const storage = window.storageService;
 const calcService = window.calculationService;
+const incomeRecords = window.incomeRecordsModule;
 
 const currentMonthKey = getCurrentMonthKey();
 const currentMonthDate = getCurrentMonthDate();
@@ -355,6 +361,134 @@ describe('理财收益', () => {
       
       const result = calcService.getInvestmentChartData();
       expect(result.monthlyData[currentMonthKey].rate).toBe('0.0');
+    });
+  });
+
+  describe('7.8 图表渲染（负数显示）', () => {
+    let container;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+      if (container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    });
+
+    test('负数柱子使用红色，正数柱子使用绿色', () => {
+      const prevMonth = getPrevMonthDate(1);
+      
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: 8000, date: prevMonth.date
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 995000, investmentBalance: -5000, date: currentMonthDate
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      // 正数柱子使用绿色 #10b981
+      expect(html).toContain('#10b981');
+      // 负数柱子使用红色 #ef4444
+      expect(html).toContain('#ef4444');
+    });
+
+    test('有负数时显示零线（虚线）', () => {
+      const prevMonth = getPrevMonthDate(1);
+      
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: 8000, date: prevMonth.date
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 995000, investmentBalance: -5000, date: currentMonthDate
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      // 零线使用 stroke-dasharray 虚线
+      expect(html).toContain('stroke-dasharray="4,4"');
+    });
+
+    test('全为正数时不显示零线和亏损图例', () => {
+      const prevMonth = getPrevMonthDate(1);
+      
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: 5000, date: prevMonth.date
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1010000, investmentBalance: 8000, date: currentMonthDate
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      expect(html).not.toContain('stroke-dasharray="4,4"');
+      expect(html).not.toContain('亏损');
+    });
+
+    test('Y轴刻度包含0（零线对齐）', () => {
+      const prevMonth = getPrevMonthDate(1);
+      
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: 8000, date: prevMonth.date
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 995000, investmentBalance: -5000, date: currentMonthDate
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      // 刻度中应包含 "0.0万" 或 "0万"
+      expect(html).toMatch(/0(\.0)?万/);
+    });
+
+    test('刻度不重复（步长<1万时使用1位小数）', () => {
+      // 构造数据使得 niceStep = 5000
+      storage.addTransaction({
+        type: 'income', capitalBalance: 950000, investmentBalance: 3000, date: '2026-05-28'
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 980000, investmentBalance: -2000, date: '2026-06-28'
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: -5000, date: '2026-07-28'
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1020000, investmentBalance: 8000, date: '2026-08-28'
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      // 应显示 0.5万（1位小数），而非四舍五入为 1万
+      expect(html).toContain('0.5万');
+      // 不应出现两个相同的刻度值
+      const tickMatches = html.match(/-?[\d.]+万/g) || [];
+      const uniqueTicks = new Set(tickMatches);
+      expect(tickMatches.length).toBe(uniqueTicks.size);
+    });
+
+    test('负数月份图例包含"亏损"', () => {
+      const prevMonth = getPrevMonthDate(1);
+      
+      storage.addTransaction({
+        type: 'income', capitalBalance: 1000000, investmentBalance: 8000, date: prevMonth.date
+      });
+      storage.addTransaction({
+        type: 'income', capitalBalance: 995000, investmentBalance: -5000, date: currentMonthDate
+      });
+      
+      incomeRecords.displayInvestmentChart(container);
+      const html = container.innerHTML;
+      
+      expect(html).toContain('亏损');
+      expect(html).toContain('正收益');
     });
   });
 });

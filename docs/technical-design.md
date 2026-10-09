@@ -136,6 +136,45 @@ npm run build
 - Netlify
 - IGA Pages
 
+## 图表渲染规范
+
+### 理财收益趋势图（`displayInvestmentChart`）
+
+**Y 轴刻度算法（niceStep）**：
+
+为确保零线（收益=0）与 Y 轴刻度对齐，采用"漂亮数字"刻度步长算法：
+
+```javascript
+const targetTicks = 5;
+const rawRange = Math.max(maxInvestment - minInvestment, 10000);
+const baseStep = rawRange / targetTicks;
+const magnitude = Math.pow(10, Math.floor(Math.log10(baseStep)));
+const normalized = baseStep / magnitude;
+const niceStep = magnitude * (normalized > 5 ? 10 : normalized > 2 ? 5 : 2);
+```
+
+- 步长取值为 2×10ⁿ、5×10ⁿ 或 10×10ⁿ
+- `maxInvestmentCeil` 和 `minInvestmentFloor` 均为 `niceStep` 的整数倍
+- 实际刻度数 `yAxisTicks = yRange / niceStep`，保证刻度间隔 = `niceStep`，0 必在刻度上
+
+**负数渲染规则**：
+
+| 元素 | 正数 | 负数 |
+|------|------|------|
+| 柱子颜色 | `#10b981`（绿） | `#ef4444`（红） |
+| 柱子位置 | 零线上方 | 零线下方 |
+| 零线显示 | 不显示 | 显示虚线（`stroke-dasharray="4,4"`） |
+| 图例 | "正收益" | 增加"亏损" |
+
+**刻度小数位数**：
+
+```javascript
+const tickDecimals = niceStep < 10000 ? 1 : 0;
+```
+
+- `niceStep < 10000` 时显示 1 位小数（如 0.5万），避免 `toFixed(0)` 四舍五入导致刻度重复
+- `niceStep ≥ 10000` 时显示整数（如 1万）
+
 ## 开发指南
 
 请参考 `.trae/rules/project_rules.md` 了解开发规范和常见错误规避。

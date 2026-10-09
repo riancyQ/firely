@@ -226,9 +226,21 @@
 
 ### 7.1 图表展示
 - [x] 月度收益率计算
-  → 🧪 `tests/features/investment-returns.test.js` → "月度收益率计算"
+  → 🧪 `tests/modules/investment-returns.test.js` → "月度收益率计算"
 - [x] 理财数据按账户聚合
-  → 🧪 `tests/features/investment-returns.test.js` → "多账户理财聚合"
+  → 🧪 `tests/modules/investment-returns.test.js` → "多账户理财聚合"
+- [x] 负数（亏损）柱子显示为红色，位于零线下方
+  → 🧪 `tests/modules/investment-returns.test.js` → "负数柱子使用红色，正数柱子使用绿色"
+- [x] 正数柱子显示为绿色，位于零线上方
+  → 🧪 `tests/modules/investment-returns.test.js` → "负数柱子使用红色，正数柱子使用绿色"
+- [x] 存在负数时显示虚线零线，且零线与 Y 轴刻度 0 对齐
+  → 🧪 `tests/modules/investment-returns.test.js` → "有负数时显示零线（虚线）" / "Y轴刻度包含0（零线对齐）"
+- [x] 全为正数时不显示零线和"亏损"图例
+  → 🧪 `tests/modules/investment-returns.test.js` → "全为正数时不显示零线和亏损图例"
+- [x] Y 轴刻度不重复（步长<1万时使用1位小数）
+  → 🧪 `tests/modules/investment-returns.test.js` → "刻度不重复（步长<1万时使用1位小数）"
+- [x] 有负数时图例包含"亏损"
+  → 🧪 `tests/modules/investment-returns.test.js` → "负数月份图例包含亏损"
 - [ ] 柱状图正确渲染
   → 🟨 需浏览器交互测试
 - [ ] 显示本月收益率

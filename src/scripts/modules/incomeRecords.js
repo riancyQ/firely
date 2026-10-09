@@ -235,8 +235,25 @@ const incomeRecordsModule = {
     const innerWidth = chartWidth - padding.left - padding.right;
     const innerHeight = chartHeight - padding.top - padding.bottom;
     
-    const maxInvestment = Math.max(...Object.values(monthlyData).map(d => d.totalInvestment), 1);
-    const maxInvestmentCeil = Math.ceil(maxInvestment / 10000) * 10000;
+    // 计算 Y 轴范围，同时考虑正负数
+    const allInvestments = Object.values(monthlyData).map(d => d.totalInvestment);
+    const maxInvestment = Math.max(...allInvestments, 0);
+    const minInvestment = Math.min(...allInvestments, 0);
+    // 计算合适的刻度步长，确保 0 落在刻度线上
+    const targetTicks = 5;
+    const rawRange = Math.max(maxInvestment - minInvestment, 10000);
+    const baseStep = rawRange / targetTicks;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(baseStep)));
+    const normalized = baseStep / magnitude;
+    const niceStep = magnitude * (normalized > 5 ? 10 : normalized > 2 ? 5 : 2);
+    // 让 max/min 都是 step 的整数倍，确保刻度包含 0
+    const maxInvestmentCeil = Math.ceil(maxInvestment / niceStep) * niceStep;
+    const minInvestmentFloor = Math.floor(minInvestment / niceStep) * niceStep;
+    const yRange = maxInvestmentCeil - minInvestmentFloor;
+    // 实际刻度数 = yRange / niceStep（保证刻度间隔为 niceStep，0 必在刻度上）
+    const yAxisTicks = Math.round(yRange / niceStep);
+    // 零线位置（投资收益为 0 的水平线）
+    const zeroY = padding.top + (maxInvestmentCeil / yRange) * innerHeight;
     
     const latestMonth = sortedMonths[sortedMonths.length - 1];
     const latestRate = monthlyData[latestMonth]?.rate;
@@ -262,12 +279,18 @@ const incomeRecordsModule = {
     html += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${chartHeight - padding.bottom}" stroke="#eee" stroke-width="1" />`;
     html += `<line x1="${padding.left}" y1="${chartHeight - padding.bottom}" x2="${chartWidth - padding.right}" y2="${chartHeight - padding.bottom}" stroke="#eee" stroke-width="1" />`;
     
-    const yAxisTicks = 5;
+    // 零线（当有负数时显示）
+    if (minInvestmentFloor < 0) {
+      html += `<line x1="${padding.left}" y1="${zeroY}" x2="${chartWidth - padding.right}" y2="${zeroY}" stroke="#999" stroke-width="1" stroke-dasharray="4,4" />`;
+    }
+    
+    // 根据刻度步长决定小数位数，避免四舍五入导致刻度重复
+    const tickDecimals = niceStep < 10000 ? 1 : 0;
     for (let i = 0; i <= yAxisTicks; i++) {
       const y = padding.top + (innerHeight / yAxisTicks) * i;
-      const value = maxInvestmentCeil - (maxInvestmentCeil / yAxisTicks) * i;
+      const value = maxInvestmentCeil - (yRange / yAxisTicks) * i;
       html += `<line x1="${padding.left - 5}" y1="${y}" x2="${padding.left}" y2="${y}" stroke="#999" stroke-width="1" />`;
-      html += `<text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="#999">${(value / 10000).toFixed(0)}万</text>`;
+      html += `<text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="#999">${(value / 10000).toFixed(tickDecimals)}万</text>`;
     }
     
     const barWidth = Math.min(30, innerWidth / sortedMonths.length * 0.6);
@@ -276,14 +299,18 @@ const incomeRecordsModule = {
     sortedMonths.forEach((monthKey, index) => {
       const data = monthlyData[monthKey];
       const x = padding.left + gap * index + (gap - barWidth) / 2;
-      const barHeight = (data.totalInvestment / maxInvestmentCeil) * innerHeight;
-      const y = chartHeight - padding.bottom - barHeight;
       
-      const rate = data.rate;
+      const isPositive = data.totalInvestment >= 0;
+      const barHeight = (Math.abs(data.totalInvestment) / yRange) * innerHeight;
       const minBarHeight = 15;
       const actualBarHeight = Math.max(barHeight, minBarHeight);
+      // 正数从零线向上，负数从零线向下
+      const y = isPositive ? zeroY - actualBarHeight : zeroY;
+      const barColor = isPositive ? '#10b981' : '#ef4444';
       
-      html += `<rect x="${x}" y="${y}" width="${barWidth}" height="${actualBarHeight}" rx="4" ry="4" fill="#10b981" 
+      const rate = data.rate;
+      
+      html += `<rect x="${x}" y="${y}" width="${barWidth}" height="${actualBarHeight}" rx="4" ry="4" fill="${barColor}" 
         onmouseenter="showInvestTooltip(event, '${data.year}-${data.label}', '${rate}', '${window.calculationService.formatMoney(data.totalInvestment)}')" 
         onmouseleave="hideInvestTooltip()" style="cursor: pointer;" />`;
       
@@ -293,7 +320,10 @@ const incomeRecordsModule = {
     html += `</svg>`;
     
     html += `<div class="chart-legend">`;
-    html += `<div class="legend-item"><div class="legend-color" style="background-color: #10b981;"></div><span class="legend-text">理财收益</span></div>`;
+    html += `<div class="legend-item"><div class="legend-color" style="background-color: #10b981;"></div><span class="legend-text">正收益</span></div>`;
+    if (minInvestmentFloor < 0) {
+      html += `<div class="legend-item"><div class="legend-color" style="background-color: #ef4444;"></div><span class="legend-text">亏损</span></div>`;
+    }
     html += `</div>`;
     
     html += `</div>`;
